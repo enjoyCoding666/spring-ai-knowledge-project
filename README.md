@@ -14,6 +14,8 @@
 
 准备 Java 17+、Maven、PostgreSQL 和已启动的 Ollama。首次运行前准备两个本地模型：
 
+本地大模型管理框架Ollama及模型,详情见： https://blog.csdn.net/sinat_32502451/article/details/163534744
+
 ```bash
 ollama pull qwen3:8b
 ollama pull qwen3-embedding:0.6b
