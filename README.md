@@ -1,6 +1,6 @@
-# Spring AI 知识库问答 Demo
+# Spring AI 知识库问答 
 
-这是一个最小但完整的 Spring AI RAG 示例，支持文本知识导入、向量检索和基于知识库的 AI 问答。
+这是一个小但完整的 Spring AI RAG ，支持文本知识导入、向量检索和基于知识库的 AI 问答。
 
 ## 技术栈
 
