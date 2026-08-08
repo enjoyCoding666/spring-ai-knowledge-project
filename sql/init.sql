@@ -1,4 +1,4 @@
--- Spring AI 知识库 Demo PostgreSQL 初始化脚本
+-- Spring AI 知识库项目 PostgreSQL 初始化脚本
 -- 适用模型：qwen3-embedding:0.6b，向量维度：1024
 
 BEGIN;

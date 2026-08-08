@@ -1,4 +1,4 @@
-# Spring AI 知识库问答 Demo 设计
+# Spring AI 知识库问答项目设计
 
 ## 需求理解
 
