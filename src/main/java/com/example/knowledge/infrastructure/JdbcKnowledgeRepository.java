@@ -32,26 +32,47 @@ public class JdbcKnowledgeRepository implements KnowledgeRepository {
             VALUES (?, ?, ?, ?)
             """;
     private static final String COMPLETE_DOCUMENT_SQL = """
-            UPDATE t_knowledge_document SET status = ? WHERE id = ?
+            UPDATE t_knowledge_document SET status = ? WHERE id = ? AND deleted = 0
             """;
     private static final String EXISTS_KNOWLEDGE_BASE_SQL = """
-            SELECT COUNT(1) FROM t_knowledge_base WHERE id = ?
+            SELECT COUNT(1) FROM t_knowledge_base WHERE id = ? AND deleted = 0
             """;
     private static final String SEARCH_SQL = """
-            WITH query_vector AS (
+            WITH RECURSIVE query_vector AS (
                 SELECT CAST(? AS vector) AS embedding
+            ),
+            knowledge_scope(id) AS (
+                SELECT id
+                FROM t_knowledge_base
+                WHERE deleted = 0
+                  AND (CAST(? AS BIGINT) IS NULL OR id = CAST(? AS BIGINT))
+
+                UNION
+
+                SELECT child.id
+                FROM t_knowledge_base child
+                JOIN knowledge_scope parent
+                  ON child.parent_id = parent.id
+                WHERE child.deleted = 0
             )
             SELECT v.metadata ->> 'title' AS title,
                    v.content,
-                   1 - (v.embedding <=> query_vector.embedding) AS score
+                   1 - (v.embedding <=> (SELECT embedding FROM query_vector)) AS score
             FROM t_vector_store v
             JOIN t_knowledge_base kb
               ON kb.id = CAST(v.metadata ->> 'knowledgeBaseId' AS BIGINT)
-            CROSS JOIN query_vector
-            WHERE (CAST(? AS BIGINT) IS NULL OR kb.id = CAST(? AS BIGINT))
-              AND 1 - (v.embedding <=> query_vector.embedding)
+            WHERE kb.id IN (SELECT id FROM knowledge_scope)
+              AND kb.deleted = 0
+              AND v.deleted = 0
+              AND EXISTS (
+                  SELECT 1
+                  FROM t_knowledge_document document
+                  WHERE document.id = CAST(v.metadata ->> 'documentId' AS BIGINT)
+                    AND document.deleted = 0
+              )
+              AND 1 - (v.embedding <=> (SELECT embedding FROM query_vector))
                   >= kb.similarity_threshold
-            ORDER BY v.embedding <=> query_vector.embedding
+            ORDER BY v.embedding <=> (SELECT embedding FROM query_vector)
             LIMIT ?
             """;
     private static final RowMapper<Long> COUNT_ROW_MAPPER =

@@ -40,7 +40,9 @@ class JdbcKnowledgeRepositoryTest {
                     id BIGSERIAL PRIMARY KEY,
                     name VARCHAR(200) NOT NULL,
                     description TEXT,
-                    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                    create_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    update_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    deleted INTEGER NOT NULL DEFAULT 0
                 )
                 """);
         jdbcTemplate.execute("""
@@ -51,7 +53,9 @@ class JdbcKnowledgeRepositoryTest {
                     source_type VARCHAR(50),
                     content TEXT,
                     status VARCHAR(30) NOT NULL,
-                    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                    create_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    update_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    deleted INTEGER NOT NULL DEFAULT 0
                 )
                 """);
         jdbcTemplate.execute("""
@@ -61,7 +65,9 @@ class JdbcKnowledgeRepositoryTest {
                     chunk_index INTEGER NOT NULL,
                     content TEXT NOT NULL,
                     vector_document_id VARCHAR(100),
-                    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                    create_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    update_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    deleted INTEGER NOT NULL DEFAULT 0
                 )
                 """);
         jdbcTemplate.update("INSERT INTO t_knowledge_base (name) VALUES (?)", "Java Knowledge");
@@ -122,6 +128,31 @@ class JdbcKnowledgeRepositoryTest {
     }
 
     @Test
+    void shouldIgnoreSoftDeletedKnowledgeBase() {
+        jdbcTemplate.update("UPDATE t_knowledge_base SET deleted = 1 WHERE id = ?", 1L);
+
+        assertThat(repository.existsKnowledgeBase(1L)).isFalse();
+    }
+
+    @Test
+    void shouldNotCompleteSoftDeletedDocument() {
+        vectorStore.onAdd = () -> jdbcTemplate.update(
+                "UPDATE t_knowledge_document SET deleted = 1");
+        KnowledgeDocument document =
+                new KnowledgeDocument(1L, "Temporary document", "TEXT", "temporary content");
+
+        Long documentId = repository.save(
+                document,
+                List.of(new KnowledgeChunk("temporary-vector", "temporary content", 0)));
+
+        Map<String, Object> storedDocument = jdbcTemplate.queryForMap(
+                "SELECT status, deleted FROM t_knowledge_document WHERE id = ?", documentId);
+        assertThat(storedDocument)
+                .containsEntry("STATUS", "PROCESSING")
+                .containsEntry("DELETED", 1);
+    }
+
+    @Test
     void shouldFilterSpecifiedKnowledgeBaseWithItsPersistedThreshold() {
         RecordingSearchJdbcTemplate searchJdbcTemplate = new RecordingSearchJdbcTemplate();
         SearchHit expectedHit = new SearchHit("Spring AI", "Spring AI content", 0.92);
@@ -134,7 +165,14 @@ class JdbcKnowledgeRepositoryTest {
 
         assertThat(hits).containsExactly(expectedHit);
         assertThat(searchJdbcTemplate.sql)
-                .contains("JOIN t_knowledge_base", "kb.similarity_threshold")
+                .contains(
+                        "WITH RECURSIVE",
+                        "child.parent_id = parent.id",
+                        "kb.id IN (SELECT id FROM knowledge_scope)",
+                        "kb.deleted = 0",
+                        "v.deleted = 0",
+                        "document.deleted = 0",
+                        "kb.similarity_threshold")
                 .doesNotContain("similarityThreshold");
         assertThat(searchJdbcTemplate.arguments)
                 .containsExactly("[0.25,-0.5]", 1L, 1L, 3);
@@ -151,7 +189,14 @@ class JdbcKnowledgeRepositoryTest {
         searchRepository.search(null, "future tasks", 10);
 
         assertThat(searchJdbcTemplate.sql)
-                .contains("JOIN t_knowledge_base", "kb.similarity_threshold");
+                .contains(
+                        "WITH RECURSIVE",
+                        "child.parent_id = parent.id",
+                        "kb.id IN (SELECT id FROM knowledge_scope)",
+                        "kb.deleted = 0",
+                        "v.deleted = 0",
+                        "document.deleted = 0",
+                        "kb.similarity_threshold");
         assertThat(searchJdbcTemplate.arguments)
                 .containsExactly("[0.1,0.2]", null, null, 10);
     }
@@ -159,10 +204,12 @@ class JdbcKnowledgeRepositoryTest {
     private static final class RecordingVectorStore implements VectorStore {
 
         private final List<Document> addedDocuments = new ArrayList<>();
+        private Runnable onAdd = () -> { };
 
         @Override
         public void add(List<Document> documents) {
             addedDocuments.addAll(documents);
+            onAdd.run();
         }
 
         @Override

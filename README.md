@@ -42,8 +42,11 @@ CREATE EXTENSION IF NOT EXISTS vector;
 psql -U postgres -d postgres -f sql/init.sql
 ```
 
-已有数据库请执行仅包含 DDL 的迁移脚本
-[`sql/migrate_add_similarity_threshold.sql`](sql/migrate_add_similarity_threshold.sql)。
+已有数据库请按顺序执行仅包含 DDL 的迁移脚本：
+
+- [`sql/migrate_add_similarity_threshold.sql`](sql/migrate_add_similarity_threshold.sql)
+- [`sql/migrate_add_knowledge_hierarchy.sql`](sql/migrate_add_knowledge_hierarchy.sql)
+- [`sql/migrate_add_audit_fields.sql`](sql/migrate_add_audit_fields.sql)
 
 项目使用 `t_knowledge_base`、`t_knowledge_document`、`t_document_chunk`
 三张业务表。Spring AI 默认也会自动初始化向量表 `t_vector_store`，向量维度为 1024；
@@ -77,6 +80,11 @@ export OLLAMA_TEMPERATURE="0.7"
 `spring.servlet.multipart.max-file-size` 和 `spring.servlet.multipart.max-request-size`。
 向量检索的最低相似度阈值保存在 `t_knowledge_base.similarity_threshold`，默认值为
 `0.5`。不同知识库可以设置不同阈值；低于对应知识库阈值的结果不会返回。
+知识库通过 `t_knowledge_base.parent_id` 建立无限层级父子关系。使用 DBeaver 等数据库工具
+设置直接父级后，检索某个知识库会自动覆盖当前知识库及其全部下级；不包含其父级和其他分支。
+数据库约束会阻止循环关系，以及删除仍然拥有子节点的父知识库。
+四张表统一使用 `create_time`、`update_time` 和 `deleted`。数据库触发器自动维护更新时间；
+`deleted` 使用 `0` 表示正常、`1` 表示已删除，知识检索只返回未删除的数据。
 分块参数只影响新导入的文档，已经写入 PgVector 的文档需要重新导入才会采用新参数。
 
 ## API 示例
