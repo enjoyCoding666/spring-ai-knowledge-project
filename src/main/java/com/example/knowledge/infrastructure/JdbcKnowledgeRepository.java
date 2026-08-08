@@ -7,7 +7,7 @@ import com.example.knowledge.port.KnowledgeRepository;
 import java.sql.PreparedStatement;
 import java.util.List;
 import org.springframework.ai.document.Document;
-import org.springframework.ai.vectorstore.SearchRequest;
+import org.springframework.ai.embedding.EmbeddingModel;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
@@ -18,7 +18,6 @@ import org.springframework.transaction.annotation.Transactional;
 public class JdbcKnowledgeRepository implements KnowledgeRepository {
 
     private static final String KNOWLEDGE_BASE_ID_METADATA = "knowledgeBaseId";
-    private static final double DEFAULT_SIMILARITY_THRESHOLD = 0.5;
     private static final String DOCUMENT_ID_METADATA = "documentId";
     private static final String TITLE_METADATA = "title";
     private static final String CHUNK_INDEX_METADATA = "chunkIndex";
@@ -38,30 +37,48 @@ public class JdbcKnowledgeRepository implements KnowledgeRepository {
     private static final String EXISTS_KNOWLEDGE_BASE_SQL = """
             SELECT COUNT(1) FROM t_knowledge_base WHERE id = ?
             """;
+    private static final String SEARCH_SQL = """
+            WITH query_vector AS (
+                SELECT CAST(? AS vector) AS embedding
+            )
+            SELECT v.metadata ->> 'title' AS title,
+                   v.content,
+                   1 - (v.embedding <=> query_vector.embedding) AS score
+            FROM t_vector_store v
+            JOIN t_knowledge_base kb
+              ON kb.id = CAST(v.metadata ->> 'knowledgeBaseId' AS BIGINT)
+            CROSS JOIN query_vector
+            WHERE (CAST(? AS BIGINT) IS NULL OR kb.id = CAST(? AS BIGINT))
+              AND 1 - (v.embedding <=> query_vector.embedding)
+                  >= kb.similarity_threshold
+            ORDER BY v.embedding <=> query_vector.embedding
+            LIMIT ?
+            """;
     private static final RowMapper<Long> COUNT_ROW_MAPPER =
             (resultSet, rowNumber) -> resultSet.getLong(1);
+    private static final RowMapper<SearchHit> SEARCH_HIT_ROW_MAPPER =
+            (resultSet, rowNumber) -> new SearchHit(
+                    resultSet.getString("title"),
+                    resultSet.getString("content"),
+                    resultSet.getDouble("score"));
 
     private final JdbcTemplate jdbcTemplate;
     private final VectorStore vectorStore;
+    private final EmbeddingModel embeddingModel;
     private final int batchSize;
-    private final double similarityThreshold;
-
-    public JdbcKnowledgeRepository(JdbcTemplate jdbcTemplate, VectorStore vectorStore, int batchSize) {
-        this(jdbcTemplate, vectorStore, batchSize, DEFAULT_SIMILARITY_THRESHOLD);
-    }
 
     public JdbcKnowledgeRepository(
             JdbcTemplate jdbcTemplate,
             VectorStore vectorStore,
-            int batchSize,
-            double similarityThreshold) {
+            EmbeddingModel embeddingModel,
+            int batchSize) {
         if (batchSize <= 0) {
             throw new IllegalArgumentException("Batch size must be greater than zero");
         }
         this.jdbcTemplate = jdbcTemplate;
         this.vectorStore = vectorStore;
+        this.embeddingModel = embeddingModel;
         this.batchSize = batchSize;
-        this.similarityThreshold = similarityThreshold;
     }
 
     @Override
@@ -86,18 +103,14 @@ public class JdbcKnowledgeRepository implements KnowledgeRepository {
 
     @Override
     public List<SearchHit> search(Long knowledgeBaseId, String query, int limit) {
-        var requestBuilder = SearchRequest.builder()
-                .query(query)
-                .topK(limit)
-                .similarityThreshold(similarityThreshold);
-        if (knowledgeBaseId != null) {
-            requestBuilder.filterExpression(
-                    KNOWLEDGE_BASE_ID_METADATA + " == " + knowledgeBaseId);
-        }
-        SearchRequest request = requestBuilder.build();
-        return vectorStore.similaritySearch(request).stream()
-                .map(this::toSearchHit)
-                .toList();
+        String queryVector = toPgVector(embeddingModel.embed(query));
+        return jdbcTemplate.query(
+                SEARCH_SQL,
+                SEARCH_HIT_ROW_MAPPER,
+                queryVector,
+                knowledgeBaseId,
+                knowledgeBaseId,
+                limit);
     }
 
     private Long insertDocument(KnowledgeDocument document) {
@@ -148,10 +161,18 @@ public class JdbcKnowledgeRepository implements KnowledgeRepository {
         }
     }
 
-    private SearchHit toSearchHit(Document document) {
-        String title = String.valueOf(document.getMetadata().get(TITLE_METADATA));
-        double score = document.getScore() == null ? 0.0 : document.getScore();
-        return new SearchHit(title, document.getText(), score);
+    /**
+     * 将模型向量转换为 PgVector 可识别的文本格式。
+     */
+    private String toPgVector(float[] embedding) {
+        StringBuilder vector = new StringBuilder("[");
+        for (int index = 0; index < embedding.length; index++) {
+            if (index > 0) {
+                vector.append(',');
+            }
+            vector.append(embedding[index]);
+        }
+        return vector.append(']').toString();
     }
 
     private enum DocumentStatus {

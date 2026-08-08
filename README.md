@@ -42,17 +42,15 @@ CREATE EXTENSION IF NOT EXISTS vector;
 psql -U postgres -d postgres -f sql/init.sql
 ```
 
+已有数据库请执行仅包含 DDL 的迁移脚本
+[`sql/migrate_add_similarity_threshold.sql`](sql/migrate_add_similarity_threshold.sql)。
+
 项目使用 `t_knowledge_base`、`t_knowledge_document`、`t_document_chunk`
 三张业务表。Spring AI 默认也会自动初始化向量表 `t_vector_store`，向量维度为 1024；
 初始化脚本和 Spring AI 的建表操作均可重复执行。
 
-先创建至少一个知识库记录，然后保存它的 ID：
-
-```sql
-INSERT INTO t_knowledge_base (name, description)
-VALUES ('Spring AI 知识库', 'Spring AI 学习资料')
-RETURNING id;
-```
+启动前请通过自己的数据库管理流程创建至少一个知识库，并保存它的 ID。仓库中的 SQL
+只维护表结构，不记录或备份任何表数据。
 
 确认 Ollama 默认地址 `http://localhost:11434` 可访问后配置数据库并启动项目：
 
@@ -70,7 +68,6 @@ export OLLAMA_BASE_URL="http://localhost:11434"
 export OLLAMA_CHAT_MODEL="qwen3:8b"
 export OLLAMA_EMBEDDING_MODEL="qwen3-embedding:0.6b"
 export OLLAMA_TEMPERATURE="0.7"
-export KNOWLEDGE_SIMILARITY_THRESHOLD="0.5"
 ```
 
 服务默认端口为 `8082`。文档分块大小默认为 500 个字符，相邻分块重叠 50 个字符，
@@ -78,8 +75,8 @@ export KNOWLEDGE_SIMILARITY_THRESHOLD="0.5"
 大小默认为 500，可通过 `KNOWLEDGE_BATCH_SIZE` 调整。纯文本文件默认最大为 10 MB，可通过
 `KNOWLEDGE_MAX_FILE_SIZE` 调整应用读取上限；如需超过 10 MB，还需要同步调整
 `spring.servlet.multipart.max-file-size` 和 `spring.servlet.multipart.max-request-size`。
-向量检索的最低相似度阈值默认为 `0.5`，可通过
-`KNOWLEDGE_SIMILARITY_THRESHOLD` 调整；低于阈值的结果不会返回。
+向量检索的最低相似度阈值保存在 `t_knowledge_base.similarity_threshold`，默认值为
+`0.5`。不同知识库可以设置不同阈值；低于对应知识库阈值的结果不会返回。
 分块参数只影响新导入的文档，已经写入 PgVector 的文档需要重新导入才会采用新参数。
 
 ## API 示例

@@ -10,10 +10,13 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- 知识库主表。
 CREATE TABLE IF NOT EXISTS t_knowledge_base (
-    id          BIGSERIAL PRIMARY KEY,
-    name        VARCHAR(200) NOT NULL,
-    description TEXT,
-    created_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    id                   BIGSERIAL PRIMARY KEY,
+    name                 VARCHAR(200) NOT NULL,
+    description          TEXT,
+    similarity_threshold DOUBLE PRECISION NOT NULL DEFAULT 0.5,
+    created_at           TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT chk_knowledge_base_similarity_threshold
+        CHECK (similarity_threshold BETWEEN 0.0 AND 1.0)
 );
 
 -- 知识文档表，content 保存导入的完整原文。

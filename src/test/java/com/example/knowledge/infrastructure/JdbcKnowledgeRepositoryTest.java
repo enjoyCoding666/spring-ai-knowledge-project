@@ -13,15 +13,21 @@ import org.h2.jdbcx.JdbcDataSource;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.document.Document;
+import org.springframework.ai.embedding.Embedding;
+import org.springframework.ai.embedding.EmbeddingModel;
+import org.springframework.ai.embedding.EmbeddingRequest;
+import org.springframework.ai.embedding.EmbeddingResponse;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.ai.vectorstore.filter.Filter;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.RowMapper;
 
 class JdbcKnowledgeRepositoryTest {
 
     private JdbcTemplate jdbcTemplate;
     private RecordingVectorStore vectorStore;
+    private RecordingEmbeddingModel embeddingModel;
     private JdbcKnowledgeRepository repository;
 
     @BeforeEach
@@ -60,7 +66,8 @@ class JdbcKnowledgeRepositoryTest {
                 """);
         jdbcTemplate.update("INSERT INTO t_knowledge_base (name) VALUES (?)", "Java Knowledge");
         vectorStore = new RecordingVectorStore();
-        repository = new JdbcKnowledgeRepository(jdbcTemplate, vectorStore, 2);
+        embeddingModel = new RecordingEmbeddingModel();
+        repository = new JdbcKnowledgeRepository(jdbcTemplate, vectorStore, embeddingModel, 2);
     }
 
     @Test
@@ -109,51 +116,49 @@ class JdbcKnowledgeRepositoryTest {
     }
 
     @Test
-    void shouldCheckKnowledgeBaseAndRestrictVectorSearch() {
-        vectorStore.searchResults = List.of(Document.builder()
-                .id("vector-1")
-                .text("Spring AI content")
-                .metadata("title", "Spring AI")
-                .score(0.92)
-                .build());
-
+    void shouldCheckKnowledgeBase() {
         assertThat(repository.existsKnowledgeBase(1L)).isTrue();
         assertThat(repository.existsKnowledgeBase(99L)).isFalse();
-
-        List<SearchHit> hits = repository.search(1L, "Spring AI", 3);
-
-        assertThat(hits).containsExactly(new SearchHit("Spring AI", "Spring AI content", 0.92));
-        assertThat(vectorStore.searchRequest.getQuery()).isEqualTo("Spring AI");
-        assertThat(vectorStore.searchRequest.getTopK()).isEqualTo(3);
-        assertThat(vectorStore.searchRequest.getSimilarityThreshold()).isEqualTo(0.5);
-        assertThat(vectorStore.searchRequest.getFilterExpression().toString())
-                .contains("knowledgeBaseId", "1");
     }
 
     @Test
-    void shouldSearchAllKnowledgeBasesWithoutVectorFilter() {
-        repository.search(null, "Spring AI", 3);
+    void shouldFilterSpecifiedKnowledgeBaseWithItsPersistedThreshold() {
+        RecordingSearchJdbcTemplate searchJdbcTemplate = new RecordingSearchJdbcTemplate();
+        SearchHit expectedHit = new SearchHit("Spring AI", "Spring AI content", 0.92);
+        searchJdbcTemplate.results = List.of(expectedHit);
+        embeddingModel.output = new float[] {0.25F, -0.5F};
+        JdbcKnowledgeRepository searchRepository =
+                new JdbcKnowledgeRepository(searchJdbcTemplate, vectorStore, embeddingModel, 2);
 
-        assertThat(vectorStore.searchRequest.getFilterExpression()).isNull();
+        List<SearchHit> hits = searchRepository.search(1L, "Spring AI", 3);
+
+        assertThat(hits).containsExactly(expectedHit);
+        assertThat(searchJdbcTemplate.sql)
+                .contains("JOIN t_knowledge_base", "kb.similarity_threshold")
+                .doesNotContain("similarityThreshold");
+        assertThat(searchJdbcTemplate.arguments)
+                .containsExactly("[0.25,-0.5]", 1L, 1L, 3);
+        assertThat(embeddingModel.query).isEqualTo("Spring AI");
     }
 
     @Test
-    void shouldUseConfiguredSimilarityThreshold() {
-        double configuredThreshold = 0.65;
-        JdbcKnowledgeRepository configuredRepository =
-                new JdbcKnowledgeRepository(jdbcTemplate, vectorStore, 2, configuredThreshold);
+    void shouldApplyEachKnowledgeBaseThresholdWhenSearchingAllKnowledgeBases() {
+        RecordingSearchJdbcTemplate searchJdbcTemplate = new RecordingSearchJdbcTemplate();
+        embeddingModel.output = new float[] {0.1F, 0.2F};
+        JdbcKnowledgeRepository searchRepository =
+                new JdbcKnowledgeRepository(searchJdbcTemplate, vectorStore, embeddingModel, 2);
 
-        configuredRepository.search(null, "Spring AI", 3);
+        searchRepository.search(null, "future tasks", 10);
 
-        assertThat(vectorStore.searchRequest.getSimilarityThreshold())
-                .isEqualTo(configuredThreshold);
+        assertThat(searchJdbcTemplate.sql)
+                .contains("JOIN t_knowledge_base", "kb.similarity_threshold");
+        assertThat(searchJdbcTemplate.arguments)
+                .containsExactly("[0.1,0.2]", null, null, 10);
     }
 
     private static final class RecordingVectorStore implements VectorStore {
 
         private final List<Document> addedDocuments = new ArrayList<>();
-        private List<Document> searchResults = List.of();
-        private SearchRequest searchRequest;
 
         @Override
         public void add(List<Document> documents) {
@@ -170,8 +175,40 @@ class JdbcKnowledgeRepositoryTest {
 
         @Override
         public List<Document> similaritySearch(SearchRequest request) {
-            searchRequest = request;
-            return searchResults;
+            return List.of();
+        }
+
+    }
+
+    private static final class RecordingSearchJdbcTemplate extends JdbcTemplate {
+
+        private String sql;
+        private Object[] arguments;
+        private List<SearchHit> results = List.of();
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public <T> List<T> query(String sql, RowMapper<T> rowMapper, Object... args) {
+            this.sql = sql;
+            this.arguments = args;
+            return (List<T>) results;
+        }
+    }
+
+    private static final class RecordingEmbeddingModel implements EmbeddingModel {
+
+        private float[] output = new float[] {0.0F};
+        private String query;
+
+        @Override
+        public EmbeddingResponse call(EmbeddingRequest request) {
+            query = request.getInstructions().get(0);
+            return new EmbeddingResponse(List.of(new Embedding(output, 0)));
+        }
+
+        @Override
+        public float[] embed(Document document) {
+            return output;
         }
     }
 }

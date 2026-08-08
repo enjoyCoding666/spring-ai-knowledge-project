@@ -13,6 +13,7 @@ import com.example.knowledge.infrastructure.SpringAiLanguageModel;
 import com.example.knowledge.port.KnowledgeRepository;
 import com.example.knowledge.port.LanguageModel;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.embedding.EmbeddingModel;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -39,10 +40,9 @@ public class KnowledgeConfiguration {
     public KnowledgeRepository knowledgeRepository(
             JdbcTemplate jdbcTemplate,
             VectorStore vectorStore,
-            @Value("${app.knowledge.batch-size:500}") int batchSize,
-            @Value("${app.knowledge.similarity-threshold:0.5}") double similarityThreshold) {
-        return new JdbcKnowledgeRepository(
-                jdbcTemplate, vectorStore, batchSize, similarityThreshold);
+            EmbeddingModel embeddingModel,
+            @Value("${app.knowledge.batch-size:500}") int batchSize) {
+        return new JdbcKnowledgeRepository(jdbcTemplate, vectorStore, embeddingModel, batchSize);
     }
 
     @Bean
