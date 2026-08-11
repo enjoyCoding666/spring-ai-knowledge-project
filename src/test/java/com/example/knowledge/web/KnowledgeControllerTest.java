@@ -5,13 +5,14 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.request;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.example.knowledge.application.KnowledgeImportUseCase;
-import com.example.knowledge.application.KnowledgeService;
+import com.example.knowledge.application.KnowledgeSearchService;
+import com.example.knowledge.application.PassthroughReranker;
 import com.example.knowledge.application.PlainTextFileReader;
-import com.example.knowledge.application.TextChunker;
 import com.example.knowledge.domain.KnowledgeChunk;
 import com.example.knowledge.domain.KnowledgeDocument;
 import com.example.knowledge.domain.KnowledgeImportResult;
@@ -20,6 +21,7 @@ import com.example.knowledge.port.KnowledgeRepository;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.stream.IntStream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
@@ -43,10 +45,11 @@ class KnowledgeControllerTest {
             return CompletableFuture.completedFuture(new KnowledgeImportResult(42L, 2));
         };
         repository = new StubKnowledgeRepository();
-        KnowledgeService knowledgeService = new KnowledgeService(repository, new TextChunker(10, 3));
+        KnowledgeSearchService searchService =
+                new KnowledgeSearchService(repository, new PassthroughReranker(), 30);
         mockMvc = MockMvcBuilders
                 .standaloneSetup(new KnowledgeController(
-                        importer, knowledgeService, new PlainTextFileReader(MAX_FILE_SIZE)))
+                        importer, searchService, new PlainTextFileReader(MAX_FILE_SIZE)))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();
     }
@@ -144,7 +147,9 @@ class KnowledgeControllerTest {
                 .andExpect(jsonPath("$.message").value("success"))
                 .andExpect(jsonPath("$.data[0].title").value("Spring AI"))
                 .andExpect(jsonPath("$.data[0].content").value("RAG content"))
-                .andExpect(jsonPath("$.data[0].score").value(0.91));
+                .andExpect(jsonPath("$.data[0].score").value(0.91))
+                .andExpect(jsonPath("$.data[0].scoreSource").value("PGVECTOR"))
+                .andExpect(header().string("X-Rerank-Source", "PGVECTOR"));
     }
 
     @Test
@@ -167,9 +172,10 @@ class KnowledgeControllerTest {
                         .content("""
                                 {"query":"RAG"}
                                 """))
-                .andExpect(status().isOk());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(5));
 
-        assertThat(repository.searchedLimit).isEqualTo(10);
+        assertThat(repository.searchedLimit).isEqualTo(30);
     }
 
     private static final class StubKnowledgeRepository implements KnowledgeRepository {
@@ -191,7 +197,12 @@ class KnowledgeControllerTest {
         public List<SearchHit> search(Long knowledgeBaseId, String query, int limit) {
             searchedKnowledgeBaseId = knowledgeBaseId;
             searchedLimit = limit;
-            return List.of(new SearchHit("Spring AI", "RAG content", 0.91));
+            return IntStream.range(0, 6)
+                    .mapToObj(index -> new SearchHit(
+                            index == 0 ? "Spring AI" : "Guide " + index,
+                            index == 0 ? "RAG content" : "Candidate " + index,
+                            0.91 - index * 0.05))
+                    .toList();
         }
     }
 }

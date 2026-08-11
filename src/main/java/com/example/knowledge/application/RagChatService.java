@@ -2,7 +2,6 @@ package com.example.knowledge.application;
 
 import com.example.knowledge.domain.ChatAnswer;
 import com.example.knowledge.domain.SearchHit;
-import com.example.knowledge.port.KnowledgeRepository;
 import com.example.knowledge.port.LanguageModel;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -19,11 +18,11 @@ public class RagChatService {
             %s
             """;
 
-    private final KnowledgeRepository knowledgeRepository;
+    private final KnowledgeSearchService knowledgeSearchService;
     private final LanguageModel languageModel;
 
-    public RagChatService(KnowledgeRepository knowledgeRepository, LanguageModel languageModel) {
-        this.knowledgeRepository = knowledgeRepository;
+    public RagChatService(KnowledgeSearchService knowledgeSearchService, LanguageModel languageModel) {
+        this.knowledgeSearchService = knowledgeSearchService;
         this.languageModel = languageModel;
     }
 
@@ -31,7 +30,8 @@ public class RagChatService {
      * 检索知识并生成回答。
      */
     public ChatAnswer ask(Long knowledgeBaseId, String question) {
-        List<SearchHit> hits = knowledgeRepository.search(knowledgeBaseId, question, DEFAULT_SEARCH_LIMIT);
+        List<SearchHit> hits = knowledgeSearchService.search(
+                knowledgeBaseId, question, DEFAULT_SEARCH_LIMIT);
         String context = buildContext(hits);
         String answer = languageModel.generate(SYSTEM_PROMPT_TEMPLATE.formatted(context), question);
         List<String> sources = hits.stream()

@@ -3,7 +3,6 @@ package com.example.knowledge.application;
 import com.example.knowledge.domain.KnowledgeChunk;
 import com.example.knowledge.domain.KnowledgeDocument;
 import com.example.knowledge.domain.KnowledgeImportResult;
-import com.example.knowledge.domain.SearchHit;
 import com.example.knowledge.port.KnowledgeRepository;
 import java.util.List;
 import java.util.UUID;
@@ -36,13 +35,6 @@ public class KnowledgeService {
                 .toList();
         Long documentId = knowledgeRepository.save(normalizedDocument, chunks);
         return new KnowledgeImportResult(documentId, chunks.size());
-    }
-
-    /**
-     * 检索与问题相关的知识片段。
-     */
-    public List<SearchHit> search(Long knowledgeBaseId, String query, int limit) {
-        return knowledgeRepository.search(knowledgeBaseId, query, limit);
     }
 
     private KnowledgeDocument normalize(KnowledgeDocument document) {

@@ -5,3 +5,4 @@ backups/
 .vscode/
 *.iml
 .DS_Store
+.env.local

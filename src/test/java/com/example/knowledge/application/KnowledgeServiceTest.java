@@ -17,10 +17,16 @@ class KnowledgeServiceTest {
     @Test
     void shouldSplitAndSaveDocument() {
         RecordingKnowledgeRepository repository = new RecordingKnowledgeRepository();
-        KnowledgeService knowledgeService = new KnowledgeService(repository, new TextChunker(10, 3));
+        KnowledgeService knowledgeService = new KnowledgeService(repository, new TextChunker(1200));
 
         KnowledgeImportResult result = knowledgeService.importDocument(
-                new KnowledgeDocument(7L, "Spring AI", null, "abcdefghijklmnop"));
+                new KnowledgeDocument(7L, "Training", null, """
+                        # Exercise
+                        General training guidance.
+
+                        ## Recovery
+                        Stretch gently after training.
+                        """));
 
         assertThat(result).isEqualTo(new KnowledgeImportResult(42L, 2));
         assertThat(repository.savedDocument.knowledgeBaseId()).isEqualTo(7L);
@@ -28,8 +34,10 @@ class KnowledgeServiceTest {
         assertThat(repository.savedChunks)
                 .extracting(KnowledgeChunk::content, KnowledgeChunk::chunkIndex)
                 .containsExactly(
-                        org.assertj.core.groups.Tuple.tuple("abcdefghij", 0),
-                        org.assertj.core.groups.Tuple.tuple("hijklmnop", 1));
+                        org.assertj.core.groups.Tuple.tuple(
+                                "Exercise\n\nGeneral training guidance.", 0),
+                        org.assertj.core.groups.Tuple.tuple(
+                                "Exercise > Recovery\n\nStretch gently after training.", 1));
         assertThat(repository.savedChunks)
                 .extracting(KnowledgeChunk::vectorDocumentId)
                 .doesNotHaveDuplicates()
@@ -40,7 +48,7 @@ class KnowledgeServiceTest {
     void shouldRejectUnknownKnowledgeBase() {
         RecordingKnowledgeRepository repository = new RecordingKnowledgeRepository();
         repository.knowledgeBaseExists = false;
-        KnowledgeService knowledgeService = new KnowledgeService(repository, new TextChunker(10, 3));
+        KnowledgeService knowledgeService = new KnowledgeService(repository, new TextChunker(10));
 
         assertThatThrownBy(() -> knowledgeService.importDocument(
                 new KnowledgeDocument(99L, "Spring AI", "TEXT", "content")))

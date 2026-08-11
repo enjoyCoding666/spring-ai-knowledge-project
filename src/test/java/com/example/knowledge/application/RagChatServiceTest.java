@@ -19,7 +19,9 @@ class RagChatServiceTest {
                 new SearchHit("Spring AI", "Spring AI supports RAG.", 0.91),
                 new SearchHit("Vector Store", "Vector stores provide similarity search.", 0.82)));
         RecordingLanguageModel languageModel = new RecordingLanguageModel();
-        RagChatService ragChatService = new RagChatService(repository, languageModel);
+        KnowledgeSearchService searchService =
+                new KnowledgeSearchService(repository, new PassthroughReranker(), 30);
+        RagChatService ragChatService = new RagChatService(searchService, languageModel);
 
         ChatAnswer answer = ragChatService.ask(7L, "Spring AI 如何实现知识库问答？");
 
@@ -28,6 +30,7 @@ class RagChatServiceTest {
                 .contains("[来源: Vector Store]", "Vector stores provide similarity search.");
         assertThat(languageModel.question).isEqualTo("Spring AI 如何实现知识库问答？");
         assertThat(repository.knowledgeBaseId).isEqualTo(7L);
+        assertThat(repository.limit).isEqualTo(30);
         assertThat(answer.answer()).isEqualTo("基于知识库生成的回答");
         assertThat(answer.sources()).containsExactly("Spring AI", "Vector Store");
     }
@@ -36,6 +39,7 @@ class RagChatServiceTest {
 
         private final List<SearchHit> hits;
         private Long knowledgeBaseId;
+        private Integer limit;
 
         private StubKnowledgeRepository(List<SearchHit> hits) {
             this.hits = hits;
@@ -54,6 +58,7 @@ class RagChatServiceTest {
         @Override
         public List<SearchHit> search(Long knowledgeBaseId, String query, int limit) {
             this.knowledgeBaseId = knowledgeBaseId;
+            this.limit = limit;
             return hits;
         }
     }

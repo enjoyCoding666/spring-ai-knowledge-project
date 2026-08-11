@@ -1,9 +1,10 @@
 package com.example.knowledge.web;
 
 import com.example.knowledge.application.KnowledgeImportUseCase;
-import com.example.knowledge.application.KnowledgeService;
+import com.example.knowledge.application.KnowledgeSearchService;
 import com.example.knowledge.application.PlainTextFileReader;
 import com.example.knowledge.domain.KnowledgeDocument;
+import com.example.knowledge.domain.ScoreSource;
 import com.example.knowledge.domain.SearchHit;
 import com.example.knowledge.web.dto.ApiResponse;
 import com.example.knowledge.web.dto.ImportResponse;
@@ -27,18 +28,19 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/knowledge")
 public class KnowledgeController {
 
-    private static final int DEFAULT_SEARCH_LIMIT = 10;
+    private static final int DEFAULT_SEARCH_LIMIT = 5;
+    private static final String RERANK_SOURCE_HEADER = "X-Rerank-Source";
 
     private final KnowledgeImportUseCase knowledgeImporter;
-    private final KnowledgeService knowledgeService;
+    private final KnowledgeSearchService knowledgeSearchService;
     private final PlainTextFileReader plainTextFileReader;
 
     public KnowledgeController(
             KnowledgeImportUseCase knowledgeImporter,
-            KnowledgeService knowledgeService,
+            KnowledgeSearchService knowledgeSearchService,
             PlainTextFileReader plainTextFileReader) {
         this.knowledgeImporter = knowledgeImporter;
-        this.knowledgeService = knowledgeService;
+        this.knowledgeSearchService = knowledgeSearchService;
         this.plainTextFileReader = plainTextFileReader;
     }
 
@@ -75,9 +77,17 @@ public class KnowledgeController {
     }
 
     @PostMapping("/search")
-    public ApiResponse<List<SearchHit>> search(@Valid @RequestBody KnowledgeSearchRequest request) {
+    public ResponseEntity<ApiResponse<List<SearchHit>>> search(
+            @Valid @RequestBody KnowledgeSearchRequest request) {
         int searchLimit = request.limit() == null ? DEFAULT_SEARCH_LIMIT : request.limit();
-        return ApiResponse.success(knowledgeService.search(
-                request.knowledgeBaseId(), request.query(), searchLimit));
+        List<SearchHit> hits = knowledgeSearchService.search(
+                request.knowledgeBaseId(), request.query(), searchLimit);
+        ScoreSource scoreSource = hits.stream()
+                .map(SearchHit::scoreSource)
+                .findFirst()
+                .orElse(ScoreSource.PGVECTOR);
+        return ResponseEntity.ok()
+                .header(RERANK_SOURCE_HEADER, scoreSource.name())
+                .body(ApiResponse.success(hits));
     }
 }

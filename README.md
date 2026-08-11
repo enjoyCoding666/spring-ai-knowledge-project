@@ -73,9 +73,30 @@ export OLLAMA_EMBEDDING_MODEL="qwen3-embedding:0.6b"
 export OLLAMA_TEMPERATURE="0.7"
 ```
 
-服务默认端口为 `8082`。文档分块大小默认为 500 个字符，相邻分块重叠 50 个字符，
-可分别通过 `KNOWLEDGE_CHUNK_SIZE` 和 `KNOWLEDGE_OVERLAP_SIZE` 调整。分块批量写入
-大小默认为 500，可通过 `KNOWLEDGE_BATCH_SIZE` 调整。纯文本文件默认最大为 10 MB，可通过
+如需启用 Cohere 精排，在未被 Git 跟踪的 `.env.local` 中配置：
+
+```bash
+COHERE_API_KEY="你的 Cohere API Key"
+COHERE_RERANK_MODEL="rerank-v4.0-fast"
+```
+
+启动前加载本地变量：
+
+```bash
+set -a
+source .env.local
+set +a
+mvn spring-boot:run
+```
+
+配置 Key 后，PgVector 默认先召回 30 条候选，再由 Cohere 精排。未配置 Key或 Cohere
+调用失败时自动使用 PgVector 结果；日志不会记录查询、知识正文或 API Key。
+
+服务默认端口为 `8082`。文档采用“Markdown 标题优先、长章节和无标题文本语义补充”的
+混合分块方式，Chunk 目标范围默认为 300～1200 个字符。可通过
+`KNOWLEDGE_CHUNK_MIN_SIZE`、`KNOWLEDGE_CHUNK_MAX_SIZE`、
+`KNOWLEDGE_SEMANTIC_BREAK_PERCENTILE` 和 `KNOWLEDGE_SEMANTIC_BATCH_SIZE` 调整。
+分块批量写入大小默认为 500，可通过 `KNOWLEDGE_BATCH_SIZE` 调整。纯文本文件默认最大为 10 MB，可通过
 `KNOWLEDGE_MAX_FILE_SIZE` 调整应用读取上限；如需超过 10 MB，还需要同步调整
 `spring.servlet.multipart.max-file-size` 和 `spring.servlet.multipart.max-request-size`。
 向量检索的最低相似度阈值保存在 `t_knowledge_base.similarity_threshold`，默认值为
@@ -154,11 +175,32 @@ curl -X POST 'http://localhost:8082/api/knowledge/search' \
 {
   "knowledgeBaseId": 1,
   "query": "Spring AI",
-  "limit": 10
+  "limit": 5
 }
 ```
 
-`limit` 可以省略，默认返回最相关的 10 条，允许范围为 1～20。
+`limit` 可以省略，默认返回精排后的 5 条，允许范围为 1～20。正常精排时 `score` 是
+Cohere 相关度分数；降级时 `score` 保留为 PgVector 相似度分数。
+
+每条结果通过 `scoreSource` 明确标识评分来源，搜索响应头也会返回
+`X-Rerank-Source`。例如：
+
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": [
+    {
+      "title": "Spring AI",
+      "content": "示例知识内容",
+      "score": 0.91,
+      "scoreSource": "COHERE"
+    }
+  ]
+}
+```
+
+`COHERE` 表示 Cohere 精排结果，`PGVECTOR` 表示未启用 Cohere、发生降级或没有可精排候选。
 
 ### 4. 知识库问答
 

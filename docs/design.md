@@ -166,6 +166,65 @@ PostgreSQL 提供一个通用更新时间函数，四张表分别注册 `BEFORE 
 - 在本地 PostgreSQL 事务中验证自动更新时间与父库软删除限制，使用虚构负数 ID并回滚。
 - 刷新 schema-only 备份并扫描 SQL，确保不包含任何真实表数据。
 
+## 结构化与语义分块设计
+
+### 目标与约束
+
+- 替换固定字符窗口切分，避免不同模块内容进入同一个 Chunk。
+- 输入兼容 Markdown 与无标题普通文本，文件通常小于 100 KB。
+- Markdown 标题是强边界；标题章节过长或文本无标题时，才检测段落语义断层。
+- Chunk 目标为 300～1200 字符，优先保持标题、自然段、完整句组和代码块完整。
+- 每个 Chunk 添加完整标题路径，例如 `运动 > 有氧运动 > 跑步`。
+- Embedding 服务不可用时导入失败，不静默降级为固定字符分块。
+- 新策略只影响后续导入；已有文档需要重新导入才能更新分块与向量。
+
+### 解析和分块流程
+
+`MarkdownSectionParser` 识别代码块之外的 ATX 标题 `# / ## / ###`，构建章节及完整标题路径。
+没有标题的文本作为匿名章节。标题是强制边界，不允许跨章节合并内容。只有标题没有正文的章节
+不生成 Chunk。
+
+`ParagraphSplitter` 按空行保留自然段落；单个段落超过最大长度时，优先按照中英文句末标记
+拆为完整句组。Markdown 代码块作为不可从代码行中间拆开的整体单元。
+
+短小且结构清晰的标题章节直接生成 Chunk。匿名章节或超过 1200 字符的长章节交给
+`SemanticBoundaryDetector`：使用 `EmbeddingModel.embed(List<String>)` 批量生成段落向量，
+计算相邻段落的余弦距离，并以当前章节距离分布的第 75 百分位作为候选断层。使用严格大于
+判断，避免距离相同时强制制造边界。
+
+`TextChunker` 按以下规则组合段落：不足 300 字符时优先继续合并；达到最小长度且
+遇到语义断层时结束；加入下一段会超过 1200 字符时在段落边界结束。单个完整句组允许小于
+最小长度。最终标题路径作为正文前缀参与向量化。
+
+### 组件与配置
+
+- `TextChunker`：协调结构解析、语义边界和最终聚合的业务组件。
+- `MarkdownSectionParser`：结构解析与标题路径维护。
+- `ParagraphSplitter`：自然段、完整句组和代码块处理。
+- `SemanticBoundaryDetector`：批量向量化、余弦距离和动态分位点计算。
+
+建议配置：
+
+```properties
+app.knowledge.chunk-min-size=300
+app.knowledge.chunk-max-size=1200
+app.knowledge.semantic-break-percentile=0.75
+app.knowledge.semantic-batch-size=32
+```
+
+原 `chunk-size` 和 `overlap-size` 配置不再使用。长章节会先生成段落向量用于判断边界，最终
+Chunk 再由 PgVectorStore 向量化用于检索。由于段落和最终 Chunk 内容不同，初版接受两次
+Embedding 调用，以保持 Spring AI 写入流程简单可靠。
+
+### 测试与隐私
+
+- 使用虚构 Markdown、普通文本和固定假向量验证标题边界、动态语义断层及大小范围。
+- 验证代码块中的 `#` 不被识别为标题，代码块不会从代码行中间拆开。
+- 验证短标题章节不调用语义 Embedding，长章节采用批量调用而非逐段请求。
+- 验证相近段落合并、不同主题切开，且最终 Chunk 始终包含完整标题路径。
+- 验证 Embedding 异常导致导入失败，现有导入事务和检索测试继续通过。
+- 测试、文档和日志不得包含任何真实知识库内容。
+
 ## 决策记录
 
 - 初版选择 `SimpleVectorStore` 展示 RAG 流程；持久化版本改为 PostgreSQL + PgVector。
@@ -190,13 +249,13 @@ PostgreSQL 提供一个通用更新时间函数，四张表分别注册 `BEFORE 
 - 检索请求中的 `knowledgeBaseId` 为可选字段：传入时在 PgVector metadata 上限定知识库，
   不传时不添加向量过滤条件并检索全部知识库。当前项目没有权限体系，因此全库检索不会
   进行用户级数据隔离；引入认证后需要在仓储层补充可访问知识库范围过滤。
-- 检索请求中的 `limit` 为可选字段，默认返回 10 条，允许范围为 1～20。
+- 检索请求中的 `limit` 为可选字段；接入 Cohere Rerank 后默认返回 5 条，允许范围为 1～20。
 - 文档导入 API 和 `t_knowledge_document` 均不保留 `sourcePath/source_path`，避免持久化
   不可迁移的电脑文件路径。已有数据库通过 `sql/migrate_remove_source_path.sql` 删除该列。
 - 文件导入采用独立纯文本读取器并复用文本导入用例；读取在进入异步流程之前完成，
   初版严格支持 UTF-8 纯文本，默认最大 10 MB。
-- 针对环境配置和短条目类知识，将默认分块大小调整为 500 个字符、重叠量调整为
-  50 个字符；配置变更只影响新导入的文档。
+- 分块默认范围为 300～1200 个字符，不再使用固定字符窗口和重叠量；配置变更只影响
+  新导入的文档。
 - 向量检索阈值持久化在知识库表中，默认 `0.5`；不同知识库可独立设置。检索全部知识库时
   在一条 SQL 中按每条候选向量所属知识库的阈值过滤，避免 Java 侧广查后再过滤。
 - 项目仓库只记录数据库结构，不保存、导出或提交任何真实表数据；针对本地数据的配置调整
@@ -212,3 +271,70 @@ PostgreSQL 提供一个通用更新时间函数，四张表分别注册 `BEFORE 
   增加多表主查询 JOIN 或在 Java 中进行宽查后过滤。
 - 软删除不级联修改子树或向量数据；父库存在有效子库时禁止删除，文档删除后通过查询过滤
   隐藏其向量，以保留简单的恢复能力。
+- 文本分块采用“Markdown 标题优先、长章节和匿名文本语义补充”的混合方案；相较固定字符窗口，
+  它能保证模块边界，相较所有章节强制语义分析则减少不必要的 Embedding 调用。
+- 语义断层使用章节内相邻段落余弦距离的第 75 百分位动态判断，不设置固定距离阈值，以适应
+  不同写作风格和主题密度。
+- Chunk 不再机械重叠；通过完整标题路径、自然段边界和 300～1200 字符范围平衡上下文完整性
+  与检索精度。Embedding 不可用时选择失败而不是静默降级，避免生成不可预期的低质量向量。
+
+## Cohere Rerank 设计
+
+### 需求与边界
+
+- `/api/knowledge/search` 和 AI 问答共用同一套精排流程。
+- PgVector 负责粗召回、知识库范围、父子知识库、软删除和相似度阈值过滤。
+- Cohere 对粗召回候选进行重排，默认模型为 `rerank-v4.0-fast`。
+- 允许将查询以及最多 30 个候选 Chunk 的标题和正文发送给 Cohere 云端 API。
+- API Key、查询和知识正文不得写入日志、文档、测试或代码仓库。
+- Cohere 不可用或未配置时自动降级为 PgVector 原始结果，不影响搜索与问答可用性。
+- 不修改数据库结构，不保存 Cohere 请求或响应。
+
+### 检索流程
+
+`KnowledgeSearchService` 是统一检索编排层。它先调用 `KnowledgeRepository.search` 获取最多
+30 条候选，再调用 `Reranker` 完成精排。`CohereReranker` 是 `Reranker` 的基础设施实现，
+负责构造 SDK 请求、验证响应索引，并将 Cohere `relevanceScore` 映射回 `SearchHit.score`。
+
+搜索接口默认最终返回 5 条，显式传入 `limit` 时仍使用请求值，允许范围保持 1～20。AI 问答
+最终保留 4 个上下文 Chunk。粗召回数量独立配置为 30，确保精排有足够候选集。
+
+候选为空时不调用 Cohere。API Key 为空时使用透传实现。Cohere 认证、限流、网络、超时或响应
+校验失败统一转换为 `RerankingException`，由 `KnowledgeSearchService` 捕获后降级。降级日志使用
+英文且只记录非敏感的异常类型或状态。正常重排结果返回 Cohere 分数，降级结果保留 PgVector
+相似度分数。
+
+搜索结果的每个 `SearchHit` 增加 `scoreSource` 字段，取值为 `COHERE` 或 `PGVECTOR`。
+`/api/knowledge/search` 同时通过 `X-Rerank-Source` 响应头返回本次结果来源；没有候选结果时
+返回 `PGVECTOR`，因为此时不会调用 Cohere。该字段是新增字段，不改变原有 `code/message/data`
+响应结构。
+
+### 配置
+
+```properties
+app.knowledge.rerank.api-key=${COHERE_API_KEY:}
+app.knowledge.rerank.model=${COHERE_RERANK_MODEL:rerank-v4.0-fast}
+app.knowledge.rerank.candidate-limit=${COHERE_RERANK_CANDIDATE_LIMIT:30}
+```
+
+Cohere Java SDK 固定为 `1.10.1`，避免 SDK 更新造成不可控的兼容性变化。
+
+### 测试策略
+
+- 使用虚构候选和假 Reranker 验证粗召回数量、最终数量、排序和分数映射。
+- 验证空候选不调用 Cohere，API Key 缺失时使用 PgVector 结果。
+- 验证 Cohere 异常和无效响应索引触发降级，不泄露查询及候选内容。
+- 验证搜索接口和 AI 问答均通过 `KnowledgeSearchService` 检索。
+- 单元测试不连接 Cohere，也不读取或写入本地知识库表数据。
+
+### 决策记录
+
+- 选择独立 `KnowledgeSearchService`，未选择 Repository 装饰器或在两个业务服务中重复调用，
+  原因是统一检索规则并隔离 Cohere SDK。
+- 选择 `rerank-v4.0-fast` 作为默认模型，未继续使用 `rerank-v3.5`，原因是前者是更新的多语言
+  低延迟模型；模型名称仍允许通过环境变量覆盖。
+- 选择粗召回 30 条、搜索默认返回 5 条，兼顾精排质量、外部调用成本和响应冗余。
+- 第一版不增加 Cohere 分数阈值，也不合并相邻 Chunk；先依赖排序和 `topN` 控制结果数量，避免
+  在缺少真实评分分布时引入未经校准的阈值。
+- 选择 Cohere 故障时降级而不是返回 502，优先保证搜索与问答可用性。
+- 正常精排时 `score` 表示 Cohere 相关度，降级时表示 PgVector 相似度；不新增数据库字段。
