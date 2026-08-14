@@ -4,6 +4,7 @@ import com.cohere.api.Cohere;
 import com.example.knowledge.application.AsyncChatUseCase;
 import com.example.knowledge.application.AsyncKnowledgeImporter;
 import com.example.knowledge.application.ChatUseCase;
+import com.example.knowledge.application.KnowledgeBaseService;
 import com.example.knowledge.application.KnowledgeImportUseCase;
 import com.example.knowledge.application.KnowledgeSearchService;
 import com.example.knowledge.application.KnowledgeService;
@@ -92,6 +93,11 @@ public class KnowledgeConfiguration {
             KnowledgeRepository knowledgeRepository,
             TextChunker textChunker) {
         return new KnowledgeService(knowledgeRepository, textChunker);
+    }
+
+    @Bean
+    public KnowledgeBaseService knowledgeBaseService(KnowledgeRepository knowledgeRepository) {
+        return new KnowledgeBaseService(knowledgeRepository);
     }
 
     @Bean

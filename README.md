@@ -52,8 +52,8 @@ psql -U postgres -d postgres -f sql/init.sql
 三张业务表。Spring AI 默认也会自动初始化向量表 `t_vector_store`，向量维度为 1024；
 初始化脚本和 Spring AI 的建表操作均可重复执行。
 
-启动前请通过自己的数据库管理流程创建至少一个知识库，并保存它的 ID。仓库中的 SQL
-只维护表结构，不记录或备份任何表数据。
+仓库中的 SQL 只维护表结构，不记录或备份任何表数据。知识库可以通过
+`POST /api/knowledge/bases` 接口创建，也可以继续使用数据库工具直接插入。
 
 确认 Ollama 默认地址 `http://localhost:11434` 可访问后配置数据库并启动项目：
 
@@ -110,7 +110,36 @@ mvn spring-boot:run
 
 ## API 示例
 
-### 1. 导入知识
+### 1. 创建知识库
+
+```bash
+curl -X POST http://localhost:8082/api/knowledge/bases \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "name": "Spring AI 知识库",
+    "description": "Spring AI 相关文档",
+    "parentId": null,
+    "similarityThreshold": 0.5
+  }'
+```
+
+响应：
+
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "knowledgeBaseId": 1
+  }
+}
+```
+
+`name` 必填且不超过 200 字符。`description`、`parentId`、`similarityThreshold` 可选；
+`similarityThreshold` 缺省时使用 0.5，`parentId` 指向的父知识库必须存在。创建子知识库时
+传入父知识库 ID 即可建立层级关系。
+
+### 2. 导入知识
 
 ```bash
 curl -X POST http://localhost:8082/api/knowledge/documents \
@@ -136,7 +165,7 @@ curl -X POST http://localhost:8082/api/knowledge/documents \
 }
 ```
 
-### 2. 上传纯文本文件
+### 3. 上传纯文本文件
 
 接口使用 `multipart/form-data`，目前严格支持 UTF-8 纯文本。文件内容会保存到数据库，
 不会保存原文件路径，因此更换电脑不会影响已导入的数据。
@@ -159,7 +188,7 @@ curl -X POST http://localhost:8082/api/knowledge/files \
 响应格式与 `/api/knowledge/documents` 相同。空文件、仅含空白的文件、非法 UTF-8
 文件或超过大小限制的文件会返回 HTTP 400。
 
-### 3. 检索知识
+### 4. 检索知识
 
 ```bash
 curl -X POST 'http://localhost:8082/api/knowledge/search' \
@@ -202,7 +231,7 @@ Cohere 相关度分数；降级时 `score` 保留为 PgVector 相似度分数。
 
 `COHERE` 表示 Cohere 精排结果，`PGVECTOR` 表示未启用 Cohere、发生降级或没有可精排候选。
 
-### 4. 知识库问答
+### 5. 知识库问答
 
 ```bash
 curl -X POST http://localhost:8082/api/chat \

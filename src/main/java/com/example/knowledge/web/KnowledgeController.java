@@ -1,13 +1,17 @@
 package com.example.knowledge.web;
 
+import com.example.knowledge.application.KnowledgeBaseService;
 import com.example.knowledge.application.KnowledgeImportUseCase;
 import com.example.knowledge.application.KnowledgeSearchService;
 import com.example.knowledge.application.PlainTextFileReader;
+import com.example.knowledge.domain.KnowledgeBase;
 import com.example.knowledge.domain.KnowledgeDocument;
 import com.example.knowledge.domain.ScoreSource;
 import com.example.knowledge.domain.SearchHit;
 import com.example.knowledge.web.dto.ApiResponse;
 import com.example.knowledge.web.dto.ImportResponse;
+import com.example.knowledge.web.dto.KnowledgeBaseCreateRequest;
+import com.example.knowledge.web.dto.KnowledgeBaseCreateResponse;
 import com.example.knowledge.web.dto.KnowledgeDocumentRequest;
 import com.example.knowledge.web.dto.KnowledgeFileRequest;
 import com.example.knowledge.web.dto.KnowledgeSearchRequest;
@@ -34,14 +38,30 @@ public class KnowledgeController {
     private final KnowledgeImportUseCase knowledgeImporter;
     private final KnowledgeSearchService knowledgeSearchService;
     private final PlainTextFileReader plainTextFileReader;
+    private final KnowledgeBaseService knowledgeBaseService;
 
     public KnowledgeController(
             KnowledgeImportUseCase knowledgeImporter,
             KnowledgeSearchService knowledgeSearchService,
-            PlainTextFileReader plainTextFileReader) {
+            PlainTextFileReader plainTextFileReader,
+            KnowledgeBaseService knowledgeBaseService) {
         this.knowledgeImporter = knowledgeImporter;
         this.knowledgeSearchService = knowledgeSearchService;
         this.plainTextFileReader = plainTextFileReader;
+        this.knowledgeBaseService = knowledgeBaseService;
+    }
+
+    @PostMapping("/bases")
+    public ResponseEntity<ApiResponse<KnowledgeBaseCreateResponse>> createKnowledgeBase(
+            @Valid @RequestBody KnowledgeBaseCreateRequest request) {
+        KnowledgeBase knowledgeBase = new KnowledgeBase(
+                request.name(),
+                request.description(),
+                request.parentId(),
+                request.similarityThreshold());
+        Long knowledgeBaseId = knowledgeBaseService.createKnowledgeBase(knowledgeBase);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success(new KnowledgeBaseCreateResponse(knowledgeBaseId)));
     }
 
     @PostMapping("/documents")

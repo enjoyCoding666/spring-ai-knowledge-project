@@ -1,10 +1,12 @@
 package com.example.knowledge.infrastructure;
 
+import com.example.knowledge.domain.KnowledgeBase;
 import com.example.knowledge.domain.KnowledgeChunk;
 import com.example.knowledge.domain.KnowledgeDocument;
 import com.example.knowledge.domain.SearchHit;
 import com.example.knowledge.port.KnowledgeRepository;
 import java.sql.PreparedStatement;
+import java.sql.Types;
 import java.util.List;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.embedding.EmbeddingModel;
@@ -21,6 +23,11 @@ public class JdbcKnowledgeRepository implements KnowledgeRepository {
     private static final String DOCUMENT_ID_METADATA = "documentId";
     private static final String TITLE_METADATA = "title";
     private static final String CHUNK_INDEX_METADATA = "chunkIndex";
+    private static final String INSERT_KNOWLEDGE_BASE_SQL = """
+            INSERT INTO t_knowledge_base
+                (name, description, parent_id, similarity_threshold)
+            VALUES (?, ?, ?, ?)
+            """;
     private static final String INSERT_DOCUMENT_SQL = """
             INSERT INTO t_knowledge_document
                 (knowledge_base_id, title, source_type, content, status)
@@ -75,6 +82,7 @@ public class JdbcKnowledgeRepository implements KnowledgeRepository {
             ORDER BY v.embedding <=> (SELECT embedding FROM query_vector)
             LIMIT ?
             """;
+    private static final double DEFAULT_SIMILARITY_THRESHOLD = 0.5;
     private static final RowMapper<Long> COUNT_ROW_MAPPER =
             (resultSet, rowNumber) -> resultSet.getLong(1);
     private static final RowMapper<SearchHit> SEARCH_HIT_ROW_MAPPER =
@@ -107,6 +115,27 @@ public class JdbcKnowledgeRepository implements KnowledgeRepository {
         Long count = jdbcTemplate.queryForObject(
                 EXISTS_KNOWLEDGE_BASE_SQL, COUNT_ROW_MAPPER, knowledgeBaseId);
         return count != null && count > 0;
+    }
+
+    @Override
+    public Long createKnowledgeBase(KnowledgeBase knowledgeBase) {
+        KeyHolder keyHolder = new GeneratedKeyHolder();
+        jdbcTemplate.update(connection -> {
+            PreparedStatement statement = connection.prepareStatement(
+                    INSERT_KNOWLEDGE_BASE_SQL, new String[] {"id"});
+            statement.setString(1, knowledgeBase.name());
+            statement.setString(2, knowledgeBase.description());
+            statement.setObject(3, knowledgeBase.parentId(), Types.BIGINT);
+            statement.setDouble(4, knowledgeBase.similarityThreshold() == null
+                    ? DEFAULT_SIMILARITY_THRESHOLD
+                    : knowledgeBase.similarityThreshold());
+            return statement;
+        }, keyHolder);
+        Number generatedKey = keyHolder.getKey();
+        if (generatedKey == null) {
+            throw new IllegalStateException("Database did not return a knowledge base id");
+        }
+        return generatedKey.longValue();
     }
 
     /**

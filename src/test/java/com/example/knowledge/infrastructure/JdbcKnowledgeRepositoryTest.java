@@ -2,6 +2,7 @@ package com.example.knowledge.infrastructure;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.example.knowledge.domain.KnowledgeBase;
 import com.example.knowledge.domain.KnowledgeChunk;
 import com.example.knowledge.domain.KnowledgeDocument;
 import com.example.knowledge.domain.SearchHit;
@@ -40,6 +41,8 @@ class JdbcKnowledgeRepositoryTest {
                     id BIGSERIAL PRIMARY KEY,
                     name VARCHAR(200) NOT NULL,
                     description TEXT,
+                    parent_id BIGINT,
+                    similarity_threshold DOUBLE PRECISION NOT NULL DEFAULT 0.5,
                     create_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
                     update_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
                     deleted INTEGER NOT NULL DEFAULT 0
@@ -119,6 +122,38 @@ class JdbcKnowledgeRepositoryTest {
                 .containsEntry("documentId", documentId)
                 .containsEntry("title", "Spring AI")
                 .containsEntry("chunkIndex", 0);
+    }
+
+    @Test
+    void shouldCreateKnowledgeBase() {
+        Long knowledgeBaseId = repository.createKnowledgeBase(
+                new KnowledgeBase("Java Knowledge", "Guides", 1L, 0.6));
+
+        Map<String, Object> stored = jdbcTemplate.queryForMap("""
+                SELECT name, description, parent_id, similarity_threshold
+                FROM t_knowledge_base
+                WHERE id = ?
+                """, knowledgeBaseId);
+        assertThat(stored)
+                .containsEntry("NAME", "Java Knowledge")
+                .containsEntry("DESCRIPTION", "Guides")
+                .containsEntry("PARENT_ID", 1L)
+                .containsEntry("SIMILARITY_THRESHOLD", 0.6);
+    }
+
+    @Test
+    void shouldUseDefaultSimilarityThresholdWhenOmitted() {
+        Long knowledgeBaseId = repository.createKnowledgeBase(
+                new KnowledgeBase("Root Knowledge", null, null, null));
+
+        Map<String, Object> stored = jdbcTemplate.queryForMap("""
+                SELECT parent_id, similarity_threshold
+                FROM t_knowledge_base
+                WHERE id = ?
+                """, knowledgeBaseId);
+        assertThat(stored)
+                .containsEntry("PARENT_ID", null)
+                .containsEntry("SIMILARITY_THRESHOLD", 0.5);
     }
 
     @Test

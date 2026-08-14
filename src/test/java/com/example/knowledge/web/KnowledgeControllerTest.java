@@ -9,10 +9,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.request;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.example.knowledge.application.KnowledgeBaseService;
 import com.example.knowledge.application.KnowledgeImportUseCase;
 import com.example.knowledge.application.KnowledgeSearchService;
 import com.example.knowledge.application.PassthroughReranker;
 import com.example.knowledge.application.PlainTextFileReader;
+import com.example.knowledge.domain.KnowledgeBase;
 import com.example.knowledge.domain.KnowledgeChunk;
 import com.example.knowledge.domain.KnowledgeDocument;
 import com.example.knowledge.domain.KnowledgeImportResult;
@@ -47,11 +49,66 @@ class KnowledgeControllerTest {
         repository = new StubKnowledgeRepository();
         KnowledgeSearchService searchService =
                 new KnowledgeSearchService(repository, new PassthroughReranker(), 30);
+        KnowledgeBaseService knowledgeBaseService = new KnowledgeBaseService(repository);
         mockMvc = MockMvcBuilders
                 .standaloneSetup(new KnowledgeController(
-                        importer, searchService, new PlainTextFileReader(MAX_FILE_SIZE)))
+                        importer,
+                        searchService,
+                        new PlainTextFileReader(MAX_FILE_SIZE),
+                        knowledgeBaseService))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();
+    }
+
+    @Test
+    void shouldCreateKnowledgeBase() throws Exception {
+        mockMvc.perform(post("/api/knowledge/bases")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "name":"Java Knowledge",
+                                  "description":"Java related guides",
+                                  "parentId":3,
+                                  "similarityThreshold":0.6
+                                }
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.code").value(0))
+                .andExpect(jsonPath("$.message").value("success"))
+                .andExpect(jsonPath("$.data.knowledgeBaseId").value(10));
+
+        assertThat(repository.createdKnowledgeBase.name()).isEqualTo("Java Knowledge");
+        assertThat(repository.createdKnowledgeBase.description()).isEqualTo("Java related guides");
+        assertThat(repository.createdKnowledgeBase.parentId()).isEqualTo(3L);
+        assertThat(repository.createdKnowledgeBase.similarityThreshold()).isEqualTo(0.6);
+    }
+
+    @Test
+    void shouldRejectBlankKnowledgeBaseName() throws Exception {
+        mockMvc.perform(post("/api/knowledge/bases")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"name":"","description":"desc"}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(400))
+                .andExpect(jsonPath("$.message").value("Name must not be blank"))
+                .andExpect(jsonPath("$.data").isEmpty());
+    }
+
+    @Test
+    void shouldRejectUnknownParentKnowledgeBase() throws Exception {
+        repository.knowledgeBaseExists = false;
+
+        mockMvc.perform(post("/api/knowledge/bases")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"name":"Child Knowledge","parentId":99}
+                                """))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value(404))
+                .andExpect(jsonPath("$.message").value("Knowledge base does not exist: 99"))
+                .andExpect(jsonPath("$.data").isEmpty());
     }
 
     @Test
@@ -178,14 +235,33 @@ class KnowledgeControllerTest {
         assertThat(repository.searchedLimit).isEqualTo(30);
     }
 
+    @Test
+    void shouldReturnNotFoundForUnknownEndpoint() throws Exception {
+        mockMvc.perform(post("/api/no-such-endpoint")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value(404))
+                .andExpect(jsonPath("$.message").value("Resource not found"))
+                .andExpect(jsonPath("$.data").isEmpty());
+    }
+
     private static final class StubKnowledgeRepository implements KnowledgeRepository {
 
         private Long searchedKnowledgeBaseId;
         private Integer searchedLimit;
+        private KnowledgeBase createdKnowledgeBase;
+        private boolean knowledgeBaseExists = true;
 
         @Override
         public boolean existsKnowledgeBase(Long knowledgeBaseId) {
-            return true;
+            return knowledgeBaseExists;
+        }
+
+        @Override
+        public Long createKnowledgeBase(KnowledgeBase knowledgeBase) {
+            createdKnowledgeBase = knowledgeBase;
+            return 10L;
         }
 
         @Override

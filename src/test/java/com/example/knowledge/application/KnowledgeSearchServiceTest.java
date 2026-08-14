@@ -2,6 +2,7 @@ package com.example.knowledge.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.example.knowledge.domain.KnowledgeBase;
 import com.example.knowledge.domain.KnowledgeChunk;
 import com.example.knowledge.domain.KnowledgeDocument;
 import com.example.knowledge.domain.SearchHit;
@@ -77,6 +78,11 @@ class KnowledgeSearchServiceTest {
         @Override
         public boolean existsKnowledgeBase(Long knowledgeBaseId) {
             return true;
+        }
+
+        @Override
+        public Long createKnowledgeBase(KnowledgeBase knowledgeBase) {
+            return 1L;
         }
 
         @Override
