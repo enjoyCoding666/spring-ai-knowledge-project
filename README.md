@@ -21,6 +21,11 @@ ollama pull qwen3:8b
 ollama pull qwen3-embedding:0.6b
 ```
 
+Docker安装 PostgreSQL和 pgVector:
+```
+docker run -d --name pgvector -e POSTGRES_PASSWORD=你的密码 -p 5432:5432 -v pgvector_data:/var/lib/postgresql/data pgvector/pgvector:pg18
+```
+
 PostgreSQL 需要安装并启用 `vector` 扩展：
 
 ```sql
