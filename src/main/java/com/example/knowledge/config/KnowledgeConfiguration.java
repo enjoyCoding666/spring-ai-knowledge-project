@@ -13,6 +13,9 @@ import com.example.knowledge.application.PassthroughReranker;
 import com.example.knowledge.application.PlainTextFileReader;
 import com.example.knowledge.application.RagChatService;
 import com.example.knowledge.application.TextChunker;
+import com.example.knowledge.application.WeatherDataProvider;
+import com.example.knowledge.application.WeatherFunctionCallingService;
+import com.example.knowledge.application.WeatherFunctionCallingUseCase;
 import com.example.knowledge.infrastructure.CohereReranker;
 import com.example.knowledge.infrastructure.JdbcKnowledgeRepository;
 import com.example.knowledge.infrastructure.SpringAiDeepSeekChatPort;
@@ -69,6 +72,22 @@ public class KnowledgeConfiguration {
     @Bean
     public LanguageModel languageModel(OllamaChatModel ollamaChatModel) {
         return new SpringAiLanguageModel(ChatClient.builder(ollamaChatModel).build());
+    }
+
+    @Bean
+    public WeatherDataProvider weatherDataProvider() {
+        return new WeatherDataProvider();
+    }
+
+    /**
+     * 使用 Ollama 的聊天模型创建 Function Calling 教学用例。
+     */
+    @Bean
+    public WeatherFunctionCallingUseCase weatherFunctionCallingUseCase(
+            OllamaChatModel ollamaChatModel,
+            WeatherDataProvider weatherDataProvider) {
+        ChatClient ollamaChatClient = ChatClient.builder(ollamaChatModel).build();
+        return new WeatherFunctionCallingService(ollamaChatClient, weatherDataProvider);
     }
 
     @Bean

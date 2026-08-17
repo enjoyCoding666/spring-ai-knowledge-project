@@ -8,6 +8,7 @@
 - Spring Boot 4.1.0
 - Spring AI 2.0.0
 - Ollama 本地模型：`qwen3:8b` 与 `qwen3-embedding:0.6b`
+- Ollama + Qwen Function Calling 天气教学示例
 - DeepSeek 云端模型：`deepseek-chat`（独立对话接口，可选）
 - PostgreSQL + PgVector 持久化
 
@@ -306,6 +307,82 @@ curl -X POST http://localhost:8082/api/deepseek/chat \
 
 需要先在 `.env.local` 中配置 `DEEPSEEK_API_KEY`。该接口直接调用 DeepSeek 模型，
 与知识库检索无关。
+
+### 7. Ollama + Qwen Function Calling
+
+Function Calling 并不是让 Qwen 直接执行 Java 代码。模型只负责根据工具描述决定是否调用工具，
+并生成工具名称和 JSON 参数；真正的 Java 方法由 Spring AI 在当前应用进程中执行。
+
+这个示例使用本地模拟天气，不调用外部天气服务，也不需要新的 API Key：
+
+```bash
+curl -X POST http://localhost:8082/api/ollama/function-calling/weather \
+  -H 'Content-Type: application/json' \
+  -d '{"message":"广东今天天气怎么样？"}'
+```
+
+响应示例：
+
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "answer": "广东今天晴，温度为 26℃。",
+    "toolCalled": true,
+    "toolName": "getWeather",
+    "toolArguments": {
+      "city": "广东"
+    },
+    "toolResult": {
+      "city": "广东",
+      "condition": "晴",
+      "temperatureCelsius": 26,
+      "available": true,
+      "message": "模拟天气查询成功"
+    }
+  }
+}
+```
+
+一次天气请求实际包含下面的过程：
+
+1. Spring AI 读取 `@Tool` 和 `@ToolParam`，生成工具说明及输入 JSON Schema。
+2. Spring AI 把用户问题和工具说明发送给本地 `qwen3:8b`。
+3. Qwen 不直接回答天气，而是返回类似
+   `getWeather({"city":"广东"})` 的工具调用请求。
+4. Spring AI 在 Java 进程中执行 `WeatherTools.getWeather("广东")`。
+5. Java 返回结构化 `WeatherResult`，Spring AI 将结果再次发送给 Qwen。
+6. Qwen 阅读工具结果并生成最终自然语言回答。
+
+因此，一次 HTTP 请求通常会触发两次模型交互，但 Java 天气函数只执行一次。核心工具声明：
+
+```java
+@Tool(
+        name = "getWeather",
+        description = "查询指定中国城市的本地模拟天气。用户询问天气、温度或是否适合出行时调用。")
+public WeatherResult getWeather(
+        @ToolParam(description = "需要查询天气的中国城市或省份名称，例如广东、上海或深圳")
+        String city) {
+    return weatherDataProvider.findByCity(city);
+}
+```
+
+核心模型调用：
+
+```java
+String answer = chatClient.prompt()
+        .system(systemPrompt)
+        .user(message)
+        .tools(weatherTools)
+        .call()
+        .content();
+```
+
+`.tools(weatherTools)` 的作用是把工具能力提供给模型，不是立即执行方法。模型返回 Tool Call 后，
+Spring AI 才执行工具并继续下一轮模型调用。当前模拟数据包括广东、上海和深圳；查询其他城市时
+工具会明确返回“暂无该城市的模拟天气数据”，不会编造温度。非天气问题允许模型不调用工具，
+此时 `toolCalled` 为 `false`。
 
 所有接口统一返回 `code`、`message`、`data`。成功时 `code` 为 `0`；失败时
 `code` 与 HTTP 状态码一致，`data` 为 `null`。

@@ -338,3 +338,76 @@ Cohere Java SDK 固定为 `1.10.1`，避免 SDK 更新造成不可控的兼容�
   在缺少真实评分分布时引入未经校准的阈值。
 - 选择 Cohere 故障时降级而不是返回 502，优先保证搜索与问答可用性。
 - 正常精排时 `score` 表示 Cohere 相关度，降级时表示 PgVector 相似度；不新增数据库字段。
+
+## Ollama Function Calling 教学示例设计
+
+### 理解摘要与边界
+
+- 在当前项目中增加独立的 Ollama + `qwen3:8b` Function Calling 教学接口。
+- 使用天气查询场景，让模型从自然语言中判断是否调用 Java 天气工具并提取城市参数。
+- 天气结果来自本地模拟数据，不访问外部 API、不引入新的密钥或数据库表。
+- 响应除模型最终答案外，还展示工具是否被调用、工具名称、参数及执行结果。
+- 示例不接入 PgVector、Cohere、DeepSeek 或知识库数据，不改变现有 RAG 调用链。
+- 代码和 README 使用较详细的中文注释与说明，重点解释 Function Calling 理论流程。
+
+假设该接口仅用于单机学习和低并发演示，采用同步调用；模拟天气不要求生产级准确性或持久化。
+每次请求创建独立工具对象，避免工具调用轨迹在并发请求之间共享。日志不记录用户问题、工具参数
+或工具结果。
+
+### 方案选择
+
+采用 Spring AI 推荐的声明式 `@Tool` 方案。`WeatherTools.getWeather` 使用 `@Tool` 描述工具用途，
+城市参数使用 `@ToolParam` 描述。请求时通过 `ChatClient.tools(weatherTools)` 注册工具，Spring AI
+根据方法签名生成 JSON Schema，并负责处理模型的工具调用请求和执行 Java 方法。
+
+未采用手动 `MethodToolCallback`，因为它需要显式维护工具元数据和调用适配，教学样板代码较多；
+未采用手动控制两轮模型请求与 Tool Response 协议，因为它更适合作为理解基础抽象后的进阶示例。
+
+### 接口与组件
+
+接口定义：
+
+```http
+POST /api/ollama/function-calling/weather
+Content-Type: application/json
+```
+
+请求只包含必填的 `message`。响应继续使用 `code/message/data` 信封，`data` 包含 `answer`、
+`toolCalled`、`toolName`、`toolArguments` 和 `toolResult`。当模型没有调用工具时，
+`toolCalled` 为 `false`，其余工具轨迹字段为 `null`。
+
+- `WeatherFunctionCallingController`：校验请求并返回统一响应。
+- `WeatherFunctionCallingService`：使用绑定到 `OllamaChatModel` 的 `ChatClient` 发起调用。
+- `WeatherTools`：声明天气工具、查询模拟数据并记录本次调用轨迹。
+- `WeatherDataProvider`：维护只读的虚构城市天气映射。
+- 请求、响应、工具结果和调用轨迹使用独立 record 表达，避免无结构 Map 扩散到业务代码。
+
+### 调用流程
+
+1. Controller 将用户自然语言交给 `WeatherFunctionCallingService`。
+2. Service 为本次请求创建新的 `WeatherTools`，并通过 `.tools(weatherTools)` 提供给 Qwen。
+3. Spring AI 把工具名称、描述和输入 JSON Schema 随提示词发送给 Ollama。
+4. Qwen 判断天气问题需要工具，返回 `getWeather` 工具调用和城市参数；模型本身不会执行 Java。
+5. Spring AI 在应用进程中调用 `WeatherTools.getWeather`，取得本地模拟结果。
+6. Spring AI 将工具结果回传 Qwen，Qwen 基于结果生成自然语言最终答案。
+7. Service 同时读取本次工具对象记录的调用轨迹，组装可观察的教学响应。
+
+未知城市返回明确的“暂无模拟天气数据”，不伪造温度。非天气问题允许 Qwen 不调用工具。
+空消息由 Bean Validation 返回 HTTP 400；Ollama 不可用或模型调用失败时沿用统一 AI 服务异常响应。
+
+### 测试策略
+
+- 先为 `WeatherDataProvider` 编写已知城市和未知城市的失败测试，再实现最小模拟数据查询。
+- 使用可控的 ChatModel/端口测试 Service 是否注册工具并保留真实调用轨迹，不连接外部服务。
+- 使用 MockMvc 验证接口路径、请求校验及统一的 `code/message/data` 响应结构。
+- 验证非天气问题没有工具调用时返回 `toolCalled=false`。
+- 最后通过本地 Ollama 和 `qwen3:8b` 使用虚构天气问题完成集成验证。
+- 测试、文档和日志不得包含真实知识库内容、API Key 或其他隐私数据。
+
+### 决策记录
+
+- 选择 `@Tool + @ToolParam`，因为这是 Spring AI 当前推荐且最适合入门理解的声明式方案。
+- 选择本地模拟天气而非第三方天气 API，使示例不受网络、额度和密钥配置影响。
+- 在响应中暴露非敏感的工具调用轨迹，帮助学习者区分模型决策、Java 执行和模型总结三个阶段。
+- 每个请求创建独立 `WeatherTools`，未使用单例可变调用状态，避免并发请求相互污染。
+- 第一版只提供一个只读天气工具，不加入计算器、多工具选择、流式响应或持久化，遵守 YAGNI。
