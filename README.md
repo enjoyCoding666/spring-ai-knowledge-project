@@ -13,7 +13,11 @@
 
 ## 运行
 
+### 环境准备
+
 准备 Java 17+、Maven、PostgreSQL 和已启动的 Ollama。首次运行前准备两个本地模型：
+
+### Ollama 模型
 
 本地大模型管理框架Ollama及模型,详情见： https://blog.csdn.net/sinat_32502451/article/details/163534744
 
@@ -21,6 +25,8 @@
 ollama pull qwen3:8b
 ollama pull qwen3-embedding:0.6b
 ```
+
+### PostgreSQL 与 PgVector
 
 Docker安装 PostgreSQL和 pgVector:
 ```
@@ -32,6 +38,8 @@ PostgreSQL 需要安装并启用 `vector` 扩展：
 ```sql
 CREATE EXTENSION IF NOT EXISTS vector;
 ```
+
+### 数据库初始化
 
 项目的完整数据库初始化脚本位于 [`sql/init.sql`](sql/init.sql)，其中记录了：
 
@@ -61,6 +69,8 @@ psql -U postgres -d postgres -f sql/init.sql
 仓库中的 SQL 只维护表结构，不记录或备份任何表数据。知识库可以通过
 `POST /api/knowledge/bases` 接口创建，也可以继续使用数据库工具直接插入。
 
+### 数据库连接与项目启动
+
 确认 Ollama 默认地址 `http://localhost:11434` 可访问后配置数据库并启动项目：
 
 ```bash
@@ -69,6 +79,8 @@ export POSTGRES_USERNAME="postgres"
 export POSTGRES_PASSWORD="你的数据库密码"
 mvn spring-boot:run
 ```
+
+### Ollama 运行配置
 
 默认聊天温度为 `0.7`。如需覆盖本地地址或模型，可设置：
 
@@ -79,13 +91,20 @@ export OLLAMA_EMBEDDING_MODEL="qwen3-embedding:0.6b"
 export OLLAMA_TEMPERATURE="0.7"
 ```
 
+### 私密 Key 配置
+
+`.env.local` 位于项目根目录，完整路径是
+`spring-ai-knowledge-project/.env.local`。不需要上传到 Git 的隐私 Key 可以放在这里面。
+
 如需启用 Cohere 精排或 DeepSeek 对话，在未被 Git 跟踪的 `.env.local` 中配置：
 
 ```bash
 COHERE_API_KEY="你的 Cohere API Key"
-COHERE_RERANK_MODEL="rerank-v4.0-fast"
 DEEPSEEK_API_KEY="你的 DeepSeek API Key"
 ```
+
+Cohere 精排模型统一配置在 `application.properties` 中，当前使用
+`rerank-v4.0-fast`。
 
 启动前加载本地变量：
 
@@ -102,6 +121,8 @@ mvn spring-boot:run
 DeepSeek 通过 Spring AI 的 `spring-ai-starter-model-deepseek` 接入，`DEEPSEEK_API_KEY`
 通过环境变量注入，不会写入仓库或日志。可通过 `DEEPSEEK_BASE_URL`、
 `DEEPSEEK_CHAT_MODEL`（默认 `deepseek-chat`）和 `DEEPSEEK_TEMPERATURE` 覆盖默认配置。
+
+### 运行参数说明
 
 服务默认端口为 `8082`。文档采用“Markdown 标题优先、长章节和无标题文本语义补充”的
 混合分块方式，Chunk 目标范围默认为 300～1200 个字符。可通过
