@@ -4,6 +4,7 @@ import com.cohere.api.Cohere;
 import com.example.knowledge.application.AsyncChatUseCase;
 import com.example.knowledge.application.AsyncKnowledgeImporter;
 import com.example.knowledge.application.ChatUseCase;
+import com.example.knowledge.application.DeepSeekChatService;
 import com.example.knowledge.application.KnowledgeBaseService;
 import com.example.knowledge.application.KnowledgeImportUseCase;
 import com.example.knowledge.application.KnowledgeSearchService;
@@ -14,12 +15,16 @@ import com.example.knowledge.application.RagChatService;
 import com.example.knowledge.application.TextChunker;
 import com.example.knowledge.infrastructure.CohereReranker;
 import com.example.knowledge.infrastructure.JdbcKnowledgeRepository;
+import com.example.knowledge.infrastructure.SpringAiDeepSeekChatPort;
 import com.example.knowledge.infrastructure.SpringAiLanguageModel;
+import com.example.knowledge.port.DeepSeekChatPort;
 import com.example.knowledge.port.KnowledgeRepository;
 import com.example.knowledge.port.LanguageModel;
 import com.example.knowledge.port.Reranker;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.deepseek.DeepSeekChatModel;
 import org.springframework.ai.embedding.EmbeddingModel;
+import org.springframework.ai.ollama.OllamaChatModel;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -62,8 +67,18 @@ public class KnowledgeConfiguration {
     }
 
     @Bean
-    public LanguageModel languageModel(ChatClient.Builder chatClientBuilder) {
-        return new SpringAiLanguageModel(chatClientBuilder.build());
+    public LanguageModel languageModel(OllamaChatModel ollamaChatModel) {
+        return new SpringAiLanguageModel(ChatClient.builder(ollamaChatModel).build());
+    }
+
+    @Bean
+    public DeepSeekChatPort deepSeekChatPort(DeepSeekChatModel deepSeekChatModel) {
+        return new SpringAiDeepSeekChatPort(ChatClient.builder(deepSeekChatModel).build());
+    }
+
+    @Bean
+    public DeepSeekChatService deepSeekChatService(DeepSeekChatPort deepSeekChatPort) {
+        return new DeepSeekChatService(deepSeekChatPort);
     }
 
     @Bean

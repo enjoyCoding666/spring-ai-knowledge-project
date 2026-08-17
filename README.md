@@ -8,6 +8,7 @@
 - Spring Boot 4.1.0
 - Spring AI 2.0.0
 - Ollama 本地模型：`qwen3:8b` 与 `qwen3-embedding:0.6b`
+- DeepSeek 云端模型：`deepseek-chat`（独立对话接口，可选）
 - PostgreSQL + PgVector 持久化
 
 ## 运行
@@ -78,11 +79,12 @@ export OLLAMA_EMBEDDING_MODEL="qwen3-embedding:0.6b"
 export OLLAMA_TEMPERATURE="0.7"
 ```
 
-如需启用 Cohere 精排，在未被 Git 跟踪的 `.env.local` 中配置：
+如需启用 Cohere 精排或 DeepSeek 对话，在未被 Git 跟踪的 `.env.local` 中配置：
 
 ```bash
 COHERE_API_KEY="你的 Cohere API Key"
 COHERE_RERANK_MODEL="rerank-v4.0-fast"
+DEEPSEEK_API_KEY="你的 DeepSeek API Key"
 ```
 
 启动前加载本地变量：
@@ -96,6 +98,10 @@ mvn spring-boot:run
 
 配置 Key 后，PgVector 默认先召回 30 条候选，再由 Cohere 精排。未配置 Key或 Cohere
 调用失败时自动使用 PgVector 结果；日志不会记录查询、知识正文或 API Key。
+
+DeepSeek 通过 Spring AI 的 `spring-ai-starter-model-deepseek` 接入，`DEEPSEEK_API_KEY`
+通过环境变量注入，不会写入仓库或日志。可通过 `DEEPSEEK_BASE_URL`、
+`DEEPSEEK_CHAT_MODEL`（默认 `deepseek-chat`）和 `DEEPSEEK_TEMPERATURE` 覆盖默认配置。
 
 服务默认端口为 `8082`。文档采用“Markdown 标题优先、长章节和无标题文本语义补充”的
 混合分块方式，Chunk 目标范围默认为 300～1200 个字符。可通过
@@ -256,6 +262,29 @@ curl -X POST http://localhost:8082/api/chat \
   }
 }
 ```
+
+### 6. DeepSeek 对话
+
+```bash
+curl -X POST http://localhost:8082/api/deepseek/chat \
+  -H 'Content-Type: application/json' \
+  -d '{"message":"介绍一下 Spring AI"}'
+```
+
+响应示例：
+
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "answer": "Spring AI 是 Spring 生态中面向 AI 应用开发的框架……"
+  }
+}
+```
+
+需要先在 `.env.local` 中配置 `DEEPSEEK_API_KEY`。该接口直接调用 DeepSeek 模型，
+与知识库检索无关。
 
 所有接口统一返回 `code`、`message`、`data`。成功时 `code` 为 `0`；失败时
 `code` 与 HTTP 状态码一致，`data` 为 `null`。

@@ -37,11 +37,14 @@ class KnowledgeApplicationTest {
                         "--spring.ai.ollama.base-url=http://localhost:11434",
                         "--spring.ai.ollama.chat.options.model=qwen3:8b",
                         "--spring.ai.ollama.chat.options.temperature=0.7",
-                        "--spring.ai.ollama.embedding.options.model=qwen3-embedding:0.6b")) {
+                        "--spring.ai.ollama.embedding.options.model=qwen3-embedding:0.6b",
+                        "--spring.ai.deepseek.api-key=test-key",
+                        "--spring.ai.deepseek.chat.options.model=deepseek-chat")) {
             assertThat(context.getBean(KnowledgeImportUseCase.class)).isNotNull();
             assertThat(context.getBean(ChatUseCase.class)).isNotNull();
             assertThat(hasBeanType(context, "OllamaChatModel")).isTrue();
             assertThat(hasBeanType(context, "OllamaEmbeddingModel")).isTrue();
+            assertThat(hasBeanType(context, "DeepSeekChatModel")).isTrue();
             OllamaChatProperties chatProperties = context.getBean(OllamaChatProperties.class);
             OllamaEmbeddingProperties embeddingProperties = context.getBean(OllamaEmbeddingProperties.class);
             assertThat(chatProperties.toOptions().getModel()).isEqualTo("qwen3:8b");
