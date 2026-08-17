@@ -82,11 +82,8 @@ CREATE EXTENSION IF NOT EXISTS vector;
 psql -U postgres -d postgres -f sql/init.sql
 ```
 
-已有数据库请按顺序执行仅包含 DDL 的迁移脚本：
-
-- [`sql/migrate_add_similarity_threshold.sql`](sql/migrate_add_similarity_threshold.sql)
-- [`sql/migrate_add_knowledge_hierarchy.sql`](sql/migrate_add_knowledge_hierarchy.sql)
-- [`sql/migrate_add_audit_fields.sql`](sql/migrate_add_audit_fields.sql)
+`sql` 目录只保留完整的 `init.sql`，不再单独维护历史迁移脚本。该脚本适合初始化新数据库；
+已有数据库需要根据当前 `init.sql` 自行核对并补充结构差异。
 
 项目使用 `t_knowledge_base`、`t_knowledge_document`、`t_document_chunk`
 三张业务表。Spring AI 默认也会自动初始化向量表 `t_vector_store`，向量维度为 1024；

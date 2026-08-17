@@ -10,15 +10,10 @@ import org.junit.jupiter.api.Test;
 class KnowledgeHierarchySchemaTest {
 
     private static final Path INIT_SQL = Path.of("sql/init.sql");
-    private static final Path MIGRATION_SQL =
-            Path.of("sql/migrate_add_knowledge_hierarchy.sql");
 
     @Test
-    void shouldDefineKnowledgeHierarchyIntegrityInSchemaScripts() throws IOException {
-        assertThat(MIGRATION_SQL).exists();
-
+    void shouldDefineKnowledgeHierarchyIntegrityInInitSql() throws IOException {
         assertHierarchySchema(Files.readString(INIT_SQL));
-        assertHierarchySchema(Files.readString(MIGRATION_SQL));
     }
 
     private void assertHierarchySchema(String sql) {
