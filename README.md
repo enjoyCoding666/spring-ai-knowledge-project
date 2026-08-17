@@ -147,21 +147,55 @@ DeepSeek 通过 Spring AI 的 `spring-ai-starter-model-deepseek` 接入，`DEEPS
 
 ### 运行参数说明
 
-服务默认端口为 `8082`。文档采用“Markdown 标题优先、长章节和无标题文本语义补充”的
-混合分块方式，Chunk 目标范围默认为 300～1200 个字符。可通过
-`KNOWLEDGE_CHUNK_MIN_SIZE`、`KNOWLEDGE_CHUNK_MAX_SIZE`、
-`KNOWLEDGE_SEMANTIC_BREAK_PERCENTILE` 和 `KNOWLEDGE_SEMANTIC_BATCH_SIZE` 调整。
-分块批量写入大小默认为 500，可通过 `KNOWLEDGE_BATCH_SIZE` 调整。纯文本文件默认最大为 10 MB，可通过
-`KNOWLEDGE_MAX_FILE_SIZE` 调整应用读取上限；如需超过 10 MB，还需要同步调整
-`spring.servlet.multipart.max-file-size` 和 `spring.servlet.multipart.max-request-size`。
-向量检索的最低相似度阈值保存在 `t_knowledge_base.similarity_threshold`，默认值为
-`0.5`。不同知识库可以设置不同阈值；低于对应知识库阈值的结果不会返回。
-知识库通过 `t_knowledge_base.parent_id` 建立无限层级父子关系。使用 DBeaver 等数据库工具
-设置直接父级后，检索某个知识库会自动覆盖当前知识库及其全部下级；不包含其父级和其他分支。
-数据库约束会阻止循环关系，以及删除仍然拥有子节点的父知识库。
-四张表统一使用 `create_time`、`update_time` 和 `deleted`。数据库触发器自动维护更新时间；
-`deleted` 使用 `0` 表示正常、`1` 表示已删除，知识检索只返回未删除的数据。
-分块参数只影响新导入的文档，已经写入 PgVector 的文档需要重新导入才会采用新参数。
+#### 服务端口
+
+服务默认端口为 `8082`。
+
+#### 文档分块
+
+文档采用“Markdown 标题优先、长章节和无标题文本语义补充”的混合分块方式，Chunk 目标范围
+默认为 300～1200 个字符。
+
+可通过以下环境变量调整分块策略：
+
+- `KNOWLEDGE_CHUNK_MIN_SIZE`
+- `KNOWLEDGE_CHUNK_MAX_SIZE`
+- `KNOWLEDGE_SEMANTIC_BREAK_PERCENTILE`
+- `KNOWLEDGE_SEMANTIC_BATCH_SIZE`
+
+分块批量写入大小默认为 500，可通过 `KNOWLEDGE_BATCH_SIZE` 调整。
+
+分块参数只影响新导入的文档。已经写入 PgVector 的文档需要重新导入，才会采用新的分块参数。
+
+#### 文件上传大小
+
+纯文本文件默认最大为 10 MB，可通过 `KNOWLEDGE_MAX_FILE_SIZE` 调整应用读取上限。
+
+如需上传超过 10 MB 的文件，还需要同步调整：
+
+- `spring.servlet.multipart.max-file-size`
+- `spring.servlet.multipart.max-request-size`
+
+#### 向量检索相似度
+
+向量检索的最低相似度阈值保存在 `t_knowledge_base.similarity_threshold`，默认值为 `0.5`。
+
+不同知识库可以设置不同阈值，低于对应知识库阈值的结果不会返回。
+
+#### 知识库父子关系
+
+知识库通过 `t_knowledge_base.parent_id` 建立无限层级父子关系。可以使用 DBeaver 等数据库工具
+设置直接父级。
+
+检索某个知识库时，会自动覆盖当前知识库及其全部下级，但不包含其父级和其他分支。
+
+数据库约束会阻止循环关系，也会阻止删除仍然拥有子节点的父知识库。
+
+#### 审计与软删除字段
+
+四张表统一使用 `create_time`、`update_time` 和 `deleted`。数据库触发器会自动维护更新时间。
+
+`deleted` 使用 `0` 表示正常、`1` 表示已删除。知识检索只返回未删除的数据。
 
 ## API 示例
 
