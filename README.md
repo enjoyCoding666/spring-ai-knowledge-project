@@ -369,6 +369,9 @@ curl -X POST http://localhost:8082/api/deepseek/chat \
 Function Calling 并不是让 Qwen 直接执行 Java 代码。模型只负责根据工具描述决定是否调用工具，
 并生成工具名称和 JSON 参数；真正的 Java 方法由 Spring AI 在当前应用进程中执行。
 
+Function Calling完整的通用理论、协议流程和逐步代码讲解见
+[`docs/function-calling-guide.md`](docs/function-calling-guide.md)。
+
 这个示例使用本地模拟天气，不调用外部天气服务，也不需要新的 API Key：
 
 ```bash
