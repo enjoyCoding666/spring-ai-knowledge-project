@@ -1,5 +1,6 @@
 package com.example.knowledge.infrastructure;
 
+import static com.example.knowledge.TestComponents.springAiLanguageModel;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.List;
@@ -16,7 +17,7 @@ class SpringAiLanguageModelTest {
     @Test
     void shouldCallChatClientWithSystemPromptAndQuestion() {
         RecordingChatModel chatModel = new RecordingChatModel();
-        SpringAiLanguageModel languageModel = new SpringAiLanguageModel(ChatClient.create(chatModel));
+        SpringAiLanguageModel languageModel = springAiLanguageModel(ChatClient.create(chatModel));
 
         String answer = languageModel.generate("system prompt", "question");
 

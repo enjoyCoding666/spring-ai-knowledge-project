@@ -1,5 +1,6 @@
 package com.example.knowledge.service.rag;
 
+import static com.example.knowledge.TestComponents.plainTextFileReader;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -11,7 +12,14 @@ class PlainTextFileReaderTest {
 
     private static final long MAX_FILE_SIZE = 32L;
 
-    private final PlainTextFileReader reader = new PlainTextFileReader(MAX_FILE_SIZE);
+    private final PlainTextFileReader reader = plainTextFileReader(MAX_FILE_SIZE);
+
+    @Test
+    void shouldRejectNonPositiveMaximumFileSize() {
+        assertThatThrownBy(() -> plainTextFileReader(0))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Maximum file size must be positive");
+    }
 
     @Test
     void shouldReadUtf8Text() {

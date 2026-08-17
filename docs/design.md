@@ -476,3 +476,45 @@ RAG 的知识库管理、导入、文件读取、分块、检索、Rerank 编排
 - 数据库访问抽象命名为 `dao`，第三方模型及外部服务抽象命名为 `thirdparty`，符合本项目约定。
 - 本次不进一步拆分 `domain`、`infrastructure` 和 `config`，控制重构范围和回归风险。
 - 保持所有接口契约与业务行为不变，将测试结果作为迁移正确性的主要判据。
+
+## 全项目改用 Autowired 字段注入
+
+### 理解摘要与边界
+
+- Controller、Service、DAO 实现和模型客户端实现统一使用 `@Autowired` 字段注入。
+- 删除仅用于 Spring 依赖注入的构造方法，依赖字段不再声明为 `final`。
+- 业务类通过 `@Service`、`@Repository` 或 `@Component` 交由组件扫描发现。
+- 配置参数使用 `@Value` 字段注入，配置类只保留必须显式创建或条件选择的 Bean。
+- 异常、DTO、领域对象和纯算法内部传值构造器不属于 Spring 依赖注入，不做机械修改。
+- HTTP 接口、模型调用、数据库访问、隐私规则及降级行为保持不变。
+
+### 组件装配设计
+
+RAG、DeepSeek 和 Function Calling 的编排类使用 `@Service`。`JdbcKnowledgeDao` 使用
+`@Repository`，Spring AI 模型客户端实现和模拟数据提供器使用 `@Component`。Controller 保持
+`@RestController`，并将原有构造器依赖改为 `@Autowired` 字段。
+
+Ollama 与 DeepSeek 分别创建具名 `ChatClient` Bean。使用方通过 `@Autowired` 配合
+`@Qualifier` 选择对应客户端，避免同类型 Bean 冲突。Cohere Reranker 仍由配置类根据 API Key
+选择真实实现或透传实现，因为这是运行期配置决策，不适合同时注册两个候选组件。
+
+`WeatherTools` 保存单次工具调用轨迹，因此声明为 prototype Bean。Function Calling Service 注入
+`ObjectProvider<WeatherTools>`，每次请求获取新实例，确保并发请求之间不会共享可变状态。
+
+### 配置值与测试
+
+分块大小、语义断层、批量写入、文件大小和候选数量等参数使用 `@Value` 注入。需要基于这些参数
+初始化内部算法对象的组件在 `@PostConstruct` 阶段完成初始化。单元测试使用 Spring
+`ReflectionTestUtils` 注入假实现和测试参数，不为了测试增加生产环境 setter。
+
+迁移按功能分批进行，每批先更新测试装配并确认旧实现失败，再修改生产组件并恢复通过。最后运行
+全部测试和真实 Spring Boot 启动验证。测试及日志不得包含数据库表数据或任何 API Key。
+
+### 决策记录
+
+- 选择组件扫描加字段注入，直接满足项目统一使用经典 `@Autowired` 的要求。
+- 未选择在现有 `@Bean` 工厂对象上混用字段注入，避免装配来源分散和重复 Bean。
+- 未选择 `@Autowired` 构造器，因为用户明确希望去掉当前构造器注入写法。
+- 保留少量工厂 Bean，用于具名 `ChatClient` 和条件化 Reranker，这些属于对象创建策略而非业务类注入。
+- Function Calling 工具采用 prototype 作用域，保留原有每请求独立调用轨迹的线程安全设计。
+- 纯数据和纯算法构造器不改为字段注入，避免把不属于 Spring 容器的对象强行组件化。

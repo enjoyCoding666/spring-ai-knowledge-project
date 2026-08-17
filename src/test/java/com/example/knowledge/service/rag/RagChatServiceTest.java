@@ -1,5 +1,7 @@
 package com.example.knowledge.service.rag;
 
+import static com.example.knowledge.TestComponents.knowledgeSearchService;
+import static com.example.knowledge.TestComponents.ragChatService;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.example.knowledge.domain.ChatAnswer;
@@ -21,8 +23,8 @@ class RagChatServiceTest {
                 new SearchHit("Vector Store", "Vector stores provide similarity search.", 0.82)));
         RecordingLanguageModel languageModel = new RecordingLanguageModel();
         KnowledgeSearchService searchService =
-                new KnowledgeSearchService(repository, new PassthroughReranker(), 30);
-        RagChatService ragChatService = new RagChatService(searchService, languageModel);
+                knowledgeSearchService(repository, new PassthroughReranker(), 30);
+        RagChatService ragChatService = ragChatService(searchService, languageModel);
 
         ChatAnswer answer = ragChatService.ask(7L, "Spring AI 如何实现知识库问答？");
 

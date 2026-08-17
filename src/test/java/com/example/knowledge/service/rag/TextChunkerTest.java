@@ -1,5 +1,6 @@
 package com.example.knowledge.service.rag;
 
+import static com.example.knowledge.TestComponents.textChunker;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -15,7 +16,7 @@ class TextChunkerTest {
 
     @Test
     void shouldKeepMarkdownSectionsAndFullHeadingPathsSeparate() {
-        TextChunker textChunker = new TextChunker(1200);
+        TextChunker textChunker = textChunker(1200);
 
         List<String> chunks = textChunker.split("""
                 # Exercise
@@ -36,7 +37,7 @@ class TextChunkerTest {
 
     @Test
     void shouldBuildHeadingPathWhenMarkdownLevelsAreSkipped() {
-        TextChunker textChunker = new TextChunker(1200);
+        TextChunker textChunker = textChunker(1200);
 
         List<String> chunks = textChunker.split("""
                 # Exercise
@@ -49,7 +50,7 @@ class TextChunkerTest {
 
     @Test
     void shouldNotTreatHeadingsInsideCodeFencesAsSections() {
-        TextChunker textChunker = new TextChunker(1200);
+        TextChunker textChunker = textChunker(1200);
 
         List<String> chunks = textChunker.split("""
                 # Configuration
@@ -72,7 +73,7 @@ class TextChunkerTest {
 
     @Test
     void shouldSplitOversizedParagraphAtCompleteSentenceBoundaries() {
-        TextChunker textChunker = new TextChunker(35);
+        TextChunker textChunker = textChunker(35);
 
         List<String> chunks = textChunker.split("""
                 # Recovery
@@ -86,7 +87,7 @@ class TextChunkerTest {
 
     @Test
     void shouldReturnTrimmedTextWhenContentFitsOneChunk() {
-        TextChunker textChunker = new TextChunker(10);
+        TextChunker textChunker = textChunker(10);
 
         List<String> chunks = textChunker.split("  hello  ");
 
@@ -96,7 +97,7 @@ class TextChunkerTest {
     @Test
     void shouldSplitAnonymousTextAtDynamicSemanticBoundary() {
         RecordingEmbeddingModel embeddingModel = new RecordingEmbeddingModel();
-        TextChunker textChunker = new TextChunker(embeddingModel, 1, 1200, 0.75, 32);
+        TextChunker textChunker = textChunker(embeddingModel, 1, 1200, 0.75, 32);
 
         List<String> chunks = textChunker.split("""
                 Alpha topic details.
@@ -121,7 +122,7 @@ class TextChunkerTest {
     @Test
     void shouldNotCreateSemanticChunkBelowMinimumSize() {
         RecordingEmbeddingModel embeddingModel = new RecordingEmbeddingModel();
-        TextChunker textChunker = new TextChunker(embeddingModel, 100, 1200, 0.75, 32);
+        TextChunker textChunker = textChunker(embeddingModel, 100, 1200, 0.75, 32);
 
         List<String> chunks = textChunker.split("""
                 Alpha topic details.
@@ -146,7 +147,7 @@ class TextChunkerTest {
     @Test
     void shouldEmbedParagraphsInConfiguredBatches() {
         RecordingEmbeddingModel embeddingModel = new RecordingEmbeddingModel();
-        TextChunker textChunker = new TextChunker(embeddingModel, 1, 1200, 0.75, 2);
+        TextChunker textChunker = textChunker(embeddingModel, 1, 1200, 0.75, 2);
 
         textChunker.split("""
                 Alpha one.
@@ -168,7 +169,7 @@ class TextChunkerTest {
     @Test
     void shouldNotEmbedShortTitledSection() {
         RecordingEmbeddingModel embeddingModel = new RecordingEmbeddingModel();
-        TextChunker textChunker = new TextChunker(embeddingModel, 300, 1200, 0.75, 32);
+        TextChunker textChunker = textChunker(embeddingModel, 300, 1200, 0.75, 32);
 
         List<String> chunks = textChunker.split("""
                 # Running
@@ -193,7 +194,7 @@ class TextChunkerTest {
     @Test
     void shouldEmbedOversizedTitledSection() {
         RecordingEmbeddingModel embeddingModel = new RecordingEmbeddingModel();
-        TextChunker textChunker = new TextChunker(embeddingModel, 1, 60, 0.75, 32);
+        TextChunker textChunker = textChunker(embeddingModel, 1, 60, 0.75, 32);
 
         textChunker.split("""
                 # Running
@@ -210,7 +211,7 @@ class TextChunkerTest {
     @Test
     void shouldFailImportWhenSemanticEmbeddingIsUnavailable() {
         RecordingEmbeddingModel embeddingModel = new RecordingEmbeddingModel(true);
-        TextChunker textChunker = new TextChunker(embeddingModel, 1, 1200, 0.75, 32);
+        TextChunker textChunker = textChunker(embeddingModel, 1, 1200, 0.75, 32);
 
         assertThatThrownBy(() -> textChunker.split("""
                 First paragraph.

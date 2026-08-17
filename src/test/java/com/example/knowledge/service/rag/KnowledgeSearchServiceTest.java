@@ -1,6 +1,8 @@
 package com.example.knowledge.service.rag;
 
+import static com.example.knowledge.TestComponents.knowledgeSearchService;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.example.knowledge.domain.KnowledgeBase;
 import com.example.knowledge.domain.KnowledgeChunk;
@@ -14,6 +16,16 @@ import org.junit.jupiter.api.Test;
 class KnowledgeSearchServiceTest {
 
     @Test
+    void shouldRejectNonPositiveCandidateLimit() {
+        RecordingKnowledgeDao repository = new RecordingKnowledgeDao(List.of());
+        RecordingReranker reranker = new RecordingReranker(List.of());
+
+        assertThatThrownBy(() -> knowledgeSearchService(repository, reranker, 0))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Candidate limit must be greater than zero");
+    }
+
+    @Test
     void shouldRerankPgVectorCandidates() {
         SearchHit first = new SearchHit("Guide A", "First candidate.", 0.72);
         SearchHit second = new SearchHit("Guide B", "Second candidate.", 0.68);
@@ -22,7 +34,7 @@ class KnowledgeSearchServiceTest {
         RecordingReranker reranker = new RecordingReranker(List.of(
                 new SearchHit("Guide B", "Second candidate.", 0.96)));
         KnowledgeSearchService searchService =
-                new KnowledgeSearchService(repository, reranker, 30);
+                knowledgeSearchService(repository, reranker, 30);
 
         List<SearchHit> results = searchService.search(7L, "Which guide is relevant?", 5);
 
@@ -39,7 +51,7 @@ class KnowledgeSearchServiceTest {
                 new RecordingKnowledgeDao(List.of());
         RecordingReranker reranker = new RecordingReranker(List.of());
         KnowledgeSearchService searchService =
-                new KnowledgeSearchService(repository, reranker, 30);
+                knowledgeSearchService(repository, reranker, 30);
 
         List<SearchHit> results = searchService.search(null, "Unknown topic", 5);
 
@@ -59,7 +71,7 @@ class KnowledgeSearchServiceTest {
             throw new RerankingException("Remote reranking failed");
         };
         KnowledgeSearchService searchService =
-                new KnowledgeSearchService(repository, reranker, 30);
+                knowledgeSearchService(repository, reranker, 30);
 
         List<SearchHit> results = searchService.search(7L, "Relevant guide", 2);
 

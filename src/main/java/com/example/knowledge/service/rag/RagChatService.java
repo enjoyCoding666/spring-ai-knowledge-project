@@ -5,7 +5,10 @@ import com.example.knowledge.domain.SearchHit;
 import com.example.knowledge.thirdparty.LanguageModel;
 import java.util.List;
 import java.util.stream.Collectors;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
 
+@Service
 public class RagChatService {
 
     private static final int DEFAULT_SEARCH_LIMIT = 4;
@@ -18,13 +21,11 @@ public class RagChatService {
             %s
             """;
 
-    private final KnowledgeSearchService knowledgeSearchService;
-    private final LanguageModel languageModel;
+    @Autowired
+    private KnowledgeSearchService knowledgeSearchService;
 
-    public RagChatService(KnowledgeSearchService knowledgeSearchService, LanguageModel languageModel) {
-        this.knowledgeSearchService = knowledgeSearchService;
-        this.languageModel = languageModel;
-    }
+    @Autowired
+    private LanguageModel languageModel;
 
     /**
      * 检索知识并生成回答。

@@ -1,30 +1,35 @@
 package com.example.knowledge.service.rag;
 
+import jakarta.annotation.PostConstruct;
 import com.example.knowledge.domain.SearchHit;
 import com.example.knowledge.dao.KnowledgeDao;
 import com.example.knowledge.thirdparty.Reranker;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
 
+@Service
 public class KnowledgeSearchService {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(KnowledgeSearchService.class);
 
-    private final KnowledgeDao knowledgeDao;
-    private final Reranker reranker;
-    private final int candidateLimit;
+    @Autowired
+    private KnowledgeDao knowledgeDao;
 
-    public KnowledgeSearchService(
-            KnowledgeDao knowledgeDao,
-            Reranker reranker,
-            int candidateLimit) {
+    @Autowired
+    private Reranker reranker;
+
+    @Value("${app.knowledge.rerank.candidate-limit:30}")
+    private int candidateLimit;
+
+    @PostConstruct
+    void validateConfiguration() {
         if (candidateLimit <= 0) {
             throw new IllegalArgumentException("Candidate limit must be greater than zero");
         }
-        this.knowledgeDao = knowledgeDao;
-        this.reranker = reranker;
-        this.candidateLimit = candidateLimit;
     }
 
     /**

@@ -1,38 +1,41 @@
 package com.example.knowledge.service.rag;
 
+import jakarta.annotation.PostConstruct;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import org.springframework.ai.embedding.EmbeddingModel;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
 
+@Component
 public class TextChunker {
 
-    private final int minimumSize;
-    private final int maximumSize;
+    @Autowired
+    private EmbeddingModel embeddingModel;
+
+    @Value("${app.knowledge.chunk-min-size:300}")
+    private int minimumSize;
+
+    @Value("${app.knowledge.chunk-max-size:1200}")
+    private int maximumSize;
+
+    @Value("${app.knowledge.semantic-break-percentile:0.75}")
+    private double breakPercentile;
+
+    @Value("${app.knowledge.semantic-batch-size:32}")
+    private int semanticBatchSize;
+
     private final MarkdownSectionParser sectionParser = new MarkdownSectionParser();
     private final ParagraphSplitter paragraphSplitter = new ParagraphSplitter();
-    private final SemanticBoundaryDetector boundaryDetector;
+    private SemanticBoundaryDetector boundaryDetector;
 
-    public TextChunker(int maximumSize) {
-        if (maximumSize <= 0) {
-            throw new IllegalArgumentException("Chunk size must be positive");
-        }
-        this.minimumSize = 0;
-        this.maximumSize = maximumSize;
-        this.boundaryDetector = null;
-    }
-
-    public TextChunker(
-            EmbeddingModel embeddingModel,
-            int minimumSize,
-            int maximumSize,
-            double breakPercentile,
-            int semanticBatchSize) {
+    @PostConstruct
+    void initialize() {
         if (minimumSize <= 0 || maximumSize < minimumSize) {
             throw new IllegalArgumentException("Chunk size range is invalid");
         }
-        this.minimumSize = minimumSize;
-        this.maximumSize = maximumSize;
         this.boundaryDetector =
                 new SemanticBoundaryDetector(embeddingModel, breakPercentile, semanticBatchSize);
     }

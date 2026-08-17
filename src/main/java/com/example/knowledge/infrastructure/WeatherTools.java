@@ -6,17 +6,21 @@ import com.example.knowledge.domain.WeatherToolArguments;
 import com.example.knowledge.domain.WeatherToolInvocation;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.config.ConfigurableBeanFactory;
+import org.springframework.context.annotation.Scope;
+import org.springframework.stereotype.Component;
 
+@Component
+@Scope(ConfigurableBeanFactory.SCOPE_PROTOTYPE)
 public class WeatherTools {
 
     private static final String TOOL_NAME = "getWeather";
 
-    private final WeatherDataProvider weatherDataProvider;
-    private WeatherToolInvocation lastInvocation;
+    @Autowired
+    private WeatherDataProvider weatherDataProvider;
 
-    public WeatherTools(WeatherDataProvider weatherDataProvider) {
-        this.weatherDataProvider = weatherDataProvider;
-    }
+    private WeatherToolInvocation lastInvocation;
 
     /**
      * 提供给 Qwen 的天气查询工具。

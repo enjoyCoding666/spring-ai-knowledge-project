@@ -1,5 +1,6 @@
 package com.example.knowledge.service.rag;
 
+import static com.example.knowledge.TestComponents.knowledgeBaseService;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -16,7 +17,7 @@ class KnowledgeBaseServiceTest {
     @Test
     void shouldCreateKnowledgeBase() {
         RecordingKnowledgeDao repository = new RecordingKnowledgeDao();
-        KnowledgeBaseService knowledgeBaseService = new KnowledgeBaseService(repository);
+        KnowledgeBaseService knowledgeBaseService = knowledgeBaseService(repository);
         KnowledgeBase knowledgeBase =
                 new KnowledgeBase("Java Knowledge", "Guides", null, 0.5);
 
@@ -29,7 +30,7 @@ class KnowledgeBaseServiceTest {
     @Test
     void shouldCreateChildKnowledgeBaseWhenParentExists() {
         RecordingKnowledgeDao repository = new RecordingKnowledgeDao();
-        KnowledgeBaseService knowledgeBaseService = new KnowledgeBaseService(repository);
+        KnowledgeBaseService knowledgeBaseService = knowledgeBaseService(repository);
         KnowledgeBase knowledgeBase =
                 new KnowledgeBase("Child Knowledge", null, 7L, null);
 
@@ -43,7 +44,7 @@ class KnowledgeBaseServiceTest {
     void shouldRejectUnknownParentKnowledgeBase() {
         RecordingKnowledgeDao repository = new RecordingKnowledgeDao();
         repository.parentExists = false;
-        KnowledgeBaseService knowledgeBaseService = new KnowledgeBaseService(repository);
+        KnowledgeBaseService knowledgeBaseService = knowledgeBaseService(repository);
 
         assertThatThrownBy(() -> knowledgeBaseService.createKnowledgeBase(
                 new KnowledgeBase("Child Knowledge", null, 99L, null)))
@@ -56,7 +57,7 @@ class KnowledgeBaseServiceTest {
     @Test
     void shouldNotCheckParentWhenParentIsNull() {
         RecordingKnowledgeDao repository = new RecordingKnowledgeDao();
-        KnowledgeBaseService knowledgeBaseService = new KnowledgeBaseService(repository);
+        KnowledgeBaseService knowledgeBaseService = knowledgeBaseService(repository);
 
         knowledgeBaseService.createKnowledgeBase(
                 new KnowledgeBase("Root Knowledge", null, null, null));

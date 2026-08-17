@@ -1,103 +1,29 @@
 package com.example.knowledge.config;
 
 import com.cohere.api.Cohere;
-import com.example.knowledge.dao.KnowledgeDao;
 import com.example.knowledge.infrastructure.CohereReranker;
-import com.example.knowledge.infrastructure.JdbcKnowledgeDao;
-import com.example.knowledge.infrastructure.SpringAiDeepSeekChatClient;
-import com.example.knowledge.infrastructure.SpringAiLanguageModel;
-import com.example.knowledge.service.deepseek.DeepSeekChatService;
-import com.example.knowledge.service.functioncalling.WeatherDataProvider;
-import com.example.knowledge.service.functioncalling.WeatherFunctionCallingService;
-import com.example.knowledge.service.functioncalling.WeatherFunctionCallingUseCase;
-import com.example.knowledge.service.rag.AsyncChatUseCase;
-import com.example.knowledge.service.rag.AsyncKnowledgeImporter;
-import com.example.knowledge.service.rag.ChatUseCase;
-import com.example.knowledge.service.rag.KnowledgeBaseService;
-import com.example.knowledge.service.rag.KnowledgeImportUseCase;
-import com.example.knowledge.service.rag.KnowledgeSearchService;
-import com.example.knowledge.service.rag.KnowledgeService;
 import com.example.knowledge.service.rag.PassthroughReranker;
-import com.example.knowledge.service.rag.PlainTextFileReader;
-import com.example.knowledge.service.rag.RagChatService;
-import com.example.knowledge.service.rag.TextChunker;
-import com.example.knowledge.thirdparty.DeepSeekChatClient;
-import com.example.knowledge.thirdparty.LanguageModel;
 import com.example.knowledge.thirdparty.Reranker;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.deepseek.DeepSeekChatModel;
-import org.springframework.ai.embedding.EmbeddingModel;
 import org.springframework.ai.ollama.OllamaChatModel;
-import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.jdbc.core.JdbcTemplate;
 
 @Configuration
 public class KnowledgeConfiguration {
 
     private static final String COHERE_CLIENT_NAME = "spring-ai-knowledge-project";
 
-    @Bean
-    public TextChunker textChunker(
-            EmbeddingModel embeddingModel,
-            @Value("${app.knowledge.chunk-min-size:300}") int minimumSize,
-            @Value("${app.knowledge.chunk-max-size:1200}") int maximumSize,
-            @Value("${app.knowledge.semantic-break-percentile:0.75}") double breakPercentile,
-            @Value("${app.knowledge.semantic-batch-size:32}") int semanticBatchSize) {
-        return new TextChunker(
-                embeddingModel,
-                minimumSize,
-                maximumSize,
-                breakPercentile,
-                semanticBatchSize);
+    @Bean(AiBeanNames.OLLAMA_CHAT_CLIENT)
+    public ChatClient ollamaChatClient(OllamaChatModel ollamaChatModel) {
+        return ChatClient.builder(ollamaChatModel).build();
     }
 
-    @Bean
-    public PlainTextFileReader plainTextFileReader(
-            @Value("${app.knowledge.max-file-size:10485760}") long maxFileSize) {
-        return new PlainTextFileReader(maxFileSize);
-    }
-
-    @Bean
-    public KnowledgeDao knowledgeDao(
-            JdbcTemplate jdbcTemplate,
-            VectorStore vectorStore,
-            EmbeddingModel embeddingModel,
-            @Value("${app.knowledge.batch-size:500}") int batchSize) {
-        return new JdbcKnowledgeDao(jdbcTemplate, vectorStore, embeddingModel, batchSize);
-    }
-
-    @Bean
-    public LanguageModel languageModel(OllamaChatModel ollamaChatModel) {
-        return new SpringAiLanguageModel(ChatClient.builder(ollamaChatModel).build());
-    }
-
-    @Bean
-    public WeatherDataProvider weatherDataProvider() {
-        return new WeatherDataProvider();
-    }
-
-    /**
-     * 使用 Ollama 的聊天模型创建 Function Calling 教学用例。
-     */
-    @Bean
-    public WeatherFunctionCallingUseCase weatherFunctionCallingUseCase(
-            OllamaChatModel ollamaChatModel,
-            WeatherDataProvider weatherDataProvider) {
-        ChatClient ollamaChatClient = ChatClient.builder(ollamaChatModel).build();
-        return new WeatherFunctionCallingService(ollamaChatClient, weatherDataProvider);
-    }
-
-    @Bean
-    public DeepSeekChatClient deepSeekChatClient(DeepSeekChatModel deepSeekChatModel) {
-        return new SpringAiDeepSeekChatClient(ChatClient.builder(deepSeekChatModel).build());
-    }
-
-    @Bean
-    public DeepSeekChatService deepSeekChatService(DeepSeekChatClient deepSeekChatClient) {
-        return new DeepSeekChatService(deepSeekChatClient);
+    @Bean(AiBeanNames.DEEPSEEK_CHAT_CLIENT)
+    public ChatClient deepSeekSpringAiChatClient(DeepSeekChatModel deepSeekChatModel) {
+        return ChatClient.builder(deepSeekChatModel).build();
     }
 
     @Bean
@@ -114,40 +40,4 @@ public class KnowledgeConfiguration {
         return new CohereReranker(cohere, model);
     }
 
-    @Bean
-    public KnowledgeSearchService knowledgeSearchService(
-            KnowledgeDao knowledgeDao,
-            Reranker reranker,
-            @Value("${app.knowledge.rerank.candidate-limit:30}") int candidateLimit) {
-        return new KnowledgeSearchService(knowledgeDao, reranker, candidateLimit);
-    }
-
-    @Bean
-    public KnowledgeService knowledgeService(
-            KnowledgeDao knowledgeDao,
-            TextChunker textChunker) {
-        return new KnowledgeService(knowledgeDao, textChunker);
-    }
-
-    @Bean
-    public KnowledgeBaseService knowledgeBaseService(KnowledgeDao knowledgeDao) {
-        return new KnowledgeBaseService(knowledgeDao);
-    }
-
-    @Bean
-    public RagChatService ragChatService(
-            KnowledgeSearchService knowledgeSearchService,
-            LanguageModel languageModel) {
-        return new RagChatService(knowledgeSearchService, languageModel);
-    }
-
-    @Bean
-    public KnowledgeImportUseCase knowledgeImportUseCase(KnowledgeService knowledgeService) {
-        return new AsyncKnowledgeImporter(knowledgeService);
-    }
-
-    @Bean
-    public ChatUseCase chatUseCase(RagChatService ragChatService) {
-        return new AsyncChatUseCase(ragChatService);
-    }
 }

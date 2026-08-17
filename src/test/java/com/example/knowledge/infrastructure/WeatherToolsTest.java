@@ -1,5 +1,6 @@
 package com.example.knowledge.infrastructure;
 
+import static com.example.knowledge.TestComponents.weatherTools;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.example.knowledge.service.functioncalling.WeatherDataProvider;
@@ -10,7 +11,7 @@ class WeatherToolsTest {
 
     @Test
     void shouldRecordToolArgumentsAndResult() {
-        WeatherTools weatherTools = new WeatherTools(new WeatherDataProvider());
+        WeatherTools weatherTools = weatherTools(new WeatherDataProvider());
 
         WeatherResult result = weatherTools.getWeather("广东");
 

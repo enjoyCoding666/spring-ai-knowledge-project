@@ -1,5 +1,6 @@
 package com.example.knowledge.infrastructure;
 
+import jakarta.annotation.PostConstruct;
 import com.example.knowledge.domain.KnowledgeBase;
 import com.example.knowledge.domain.KnowledgeChunk;
 import com.example.knowledge.domain.KnowledgeDocument;
@@ -11,12 +12,16 @@ import java.util.List;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.embedding.EmbeddingModel;
 import org.springframework.ai.vectorstore.VectorStore;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
 import org.springframework.jdbc.support.KeyHolder;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.stereotype.Repository;
 
+@Repository
 public class JdbcKnowledgeDao implements KnowledgeDao {
 
     private static final String KNOWLEDGE_BASE_ID_METADATA = "knowledgeBaseId";
@@ -91,23 +96,23 @@ public class JdbcKnowledgeDao implements KnowledgeDao {
                     resultSet.getString("content"),
                     resultSet.getDouble("score"));
 
-    private final JdbcTemplate jdbcTemplate;
-    private final VectorStore vectorStore;
-    private final EmbeddingModel embeddingModel;
-    private final int batchSize;
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
 
-    public JdbcKnowledgeDao(
-            JdbcTemplate jdbcTemplate,
-            VectorStore vectorStore,
-            EmbeddingModel embeddingModel,
-            int batchSize) {
+    @Autowired
+    private VectorStore vectorStore;
+
+    @Autowired
+    private EmbeddingModel embeddingModel;
+
+    @Value("${app.knowledge.batch-size:500}")
+    private int batchSize;
+
+    @PostConstruct
+    void validateConfiguration() {
         if (batchSize <= 0) {
             throw new IllegalArgumentException("Batch size must be greater than zero");
         }
-        this.jdbcTemplate = jdbcTemplate;
-        this.vectorStore = vectorStore;
-        this.embeddingModel = embeddingModel;
-        this.batchSize = batchSize;
     }
 
     @Override

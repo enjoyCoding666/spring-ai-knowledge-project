@@ -2,14 +2,14 @@ package com.example.knowledge.service.rag;
 
 import com.example.knowledge.domain.KnowledgeBase;
 import com.example.knowledge.dao.KnowledgeDao;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
 
+@Service
 public class KnowledgeBaseService {
 
-    private final KnowledgeDao knowledgeDao;
-
-    public KnowledgeBaseService(KnowledgeDao knowledgeDao) {
-        this.knowledgeDao = knowledgeDao;
-    }
+    @Autowired
+    private KnowledgeDao knowledgeDao;
 
     /**
      * 校验父知识库存在后创建新的知识库。

@@ -14,6 +14,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.test.util.ReflectionTestUtils;
 
 class WeatherFunctionCallingControllerTest {
 
@@ -29,8 +30,10 @@ class WeatherFunctionCallingControllerTest {
                 "getWeather",
                 new WeatherToolArguments("广东"),
                 weather);
+        WeatherFunctionCallingController controller = new WeatherFunctionCallingController();
+        ReflectionTestUtils.setField(controller, "weatherFunctionCallingUseCase", useCase);
         mockMvc = MockMvcBuilders
-                .standaloneSetup(new WeatherFunctionCallingController(useCase))
+                .standaloneSetup(controller)
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();
     }

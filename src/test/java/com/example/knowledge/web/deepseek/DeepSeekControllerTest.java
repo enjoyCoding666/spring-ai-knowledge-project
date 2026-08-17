@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.test.util.ReflectionTestUtils;
 
 class DeepSeekControllerTest {
 
@@ -20,8 +21,12 @@ class DeepSeekControllerTest {
     @BeforeEach
     void setUp() {
         DeepSeekChatClient client = message -> "DeepSeek 的回答";
+        DeepSeekChatService service = new DeepSeekChatService();
+        ReflectionTestUtils.setField(service, "deepSeekChatClient", client);
+        DeepSeekController controller = new DeepSeekController();
+        ReflectionTestUtils.setField(controller, "deepSeekChatService", service);
         mockMvc = MockMvcBuilders
-                .standaloneSetup(new DeepSeekController(new DeepSeekChatService(client)))
+                .standaloneSetup(controller)
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();
     }

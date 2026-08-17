@@ -1,5 +1,6 @@
 package com.example.knowledge.infrastructure;
 
+import static com.example.knowledge.TestComponents.springAiDeepSeekChatClient;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.List;
@@ -17,7 +18,7 @@ class SpringAiDeepSeekChatClientTest {
     void shouldCallChatClientWithMessage() {
         RecordingChatModel chatModel = new RecordingChatModel();
         SpringAiDeepSeekChatClient deepSeekChatClient =
-                new SpringAiDeepSeekChatClient(ChatClient.create(chatModel));
+                springAiDeepSeekChatClient(ChatClient.create(chatModel));
 
         String answer = deepSeekChatClient.chat("你好");
 

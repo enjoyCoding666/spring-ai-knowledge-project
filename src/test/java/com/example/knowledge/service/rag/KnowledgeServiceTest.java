@@ -1,5 +1,7 @@
 package com.example.knowledge.service.rag;
 
+import static com.example.knowledge.TestComponents.knowledgeService;
+import static com.example.knowledge.TestComponents.textChunker;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -18,7 +20,7 @@ class KnowledgeServiceTest {
     @Test
     void shouldSplitAndSaveDocument() {
         RecordingKnowledgeDao repository = new RecordingKnowledgeDao();
-        KnowledgeService knowledgeService = new KnowledgeService(repository, new TextChunker(1200));
+        KnowledgeService knowledgeService = knowledgeService(repository, textChunker(1200));
 
         KnowledgeImportResult result = knowledgeService.importDocument(
                 new KnowledgeDocument(7L, "Training", null, """
@@ -49,7 +51,7 @@ class KnowledgeServiceTest {
     void shouldRejectUnknownKnowledgeBase() {
         RecordingKnowledgeDao repository = new RecordingKnowledgeDao();
         repository.knowledgeBaseExists = false;
-        KnowledgeService knowledgeService = new KnowledgeService(repository, new TextChunker(10));
+        KnowledgeService knowledgeService = knowledgeService(repository, textChunker(10));
 
         assertThatThrownBy(() -> knowledgeService.importDocument(
                 new KnowledgeDocument(99L, "Spring AI", "TEXT", "content")))

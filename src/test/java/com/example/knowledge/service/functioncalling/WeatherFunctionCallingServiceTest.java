@@ -1,5 +1,7 @@
 package com.example.knowledge.service.functioncalling;
 
+import static com.example.knowledge.TestComponents.weatherFunctionCallingService;
+import static com.example.knowledge.TestComponents.weatherTools;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.example.knowledge.domain.WeatherFunctionCallingResult;
@@ -20,9 +22,9 @@ class WeatherFunctionCallingServiceTest {
     @Test
     void shouldExecuteWeatherToolAndReturnObservableTrace() {
         WeatherToolCallingChatModel chatModel = new WeatherToolCallingChatModel();
-        WeatherFunctionCallingService service = new WeatherFunctionCallingService(
-                ChatClient.builder(chatModel).build(),
-                new WeatherDataProvider());
+        WeatherDataProvider weatherDataProvider = new WeatherDataProvider();
+        WeatherFunctionCallingService service = weatherFunctionCallingService(
+                ChatClient.builder(chatModel).build(), weatherTools(weatherDataProvider));
 
         WeatherFunctionCallingResult result = service.chat("广东今天天气怎么样？");
 

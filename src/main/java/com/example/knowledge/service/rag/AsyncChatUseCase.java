@@ -2,15 +2,15 @@ package com.example.knowledge.service.rag;
 
 import com.example.knowledge.domain.ChatAnswer;
 import java.util.concurrent.CompletableFuture;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Async;
+import org.springframework.stereotype.Service;
 
+@Service
 public class AsyncChatUseCase implements ChatUseCase {
 
-    private final RagChatService ragChatService;
-
-    public AsyncChatUseCase(RagChatService ragChatService) {
-        this.ragChatService = ragChatService;
-    }
+    @Autowired
+    private RagChatService ragChatService;
 
     @Async
     @Override

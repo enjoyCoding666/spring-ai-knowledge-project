@@ -17,6 +17,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.test.util.ReflectionTestUtils;
 
 class ChatControllerTest {
 
@@ -26,8 +27,10 @@ class ChatControllerTest {
     void setUp() {
         ChatUseCase chatUseCase = (knowledgeBaseId, question) -> CompletableFuture.completedFuture(
                 new ChatAnswer("Spring AI 通过向量检索实现 RAG。", List.of("Spring AI")));
+        ChatController controller = new ChatController();
+        ReflectionTestUtils.setField(controller, "chatUseCase", chatUseCase);
         mockMvc = MockMvcBuilders
-                .standaloneSetup(new ChatController(chatUseCase))
+                .standaloneSetup(controller)
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();
     }

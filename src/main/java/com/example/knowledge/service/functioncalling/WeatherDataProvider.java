@@ -2,7 +2,9 @@ package com.example.knowledge.service.functioncalling;
 
 import com.example.knowledge.domain.WeatherResult;
 import java.util.Map;
+import org.springframework.stereotype.Component;
 
+@Component
 public class WeatherDataProvider {
 
     private static final String UNAVAILABLE_MESSAGE = "暂无该城市的模拟天气数据";

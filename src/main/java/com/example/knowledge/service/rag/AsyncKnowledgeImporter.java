@@ -3,15 +3,15 @@ package com.example.knowledge.service.rag;
 import com.example.knowledge.domain.KnowledgeDocument;
 import com.example.knowledge.domain.KnowledgeImportResult;
 import java.util.concurrent.CompletableFuture;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Async;
+import org.springframework.stereotype.Service;
 
+@Service
 public class AsyncKnowledgeImporter implements KnowledgeImportUseCase {
 
-    private final KnowledgeService knowledgeService;
-
-    public AsyncKnowledgeImporter(KnowledgeService knowledgeService) {
-        this.knowledgeService = knowledgeService;
-    }
+    @Autowired
+    private KnowledgeService knowledgeService;
 
     @Async
     @Override

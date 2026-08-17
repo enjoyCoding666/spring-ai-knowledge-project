@@ -1,5 +1,6 @@
 package com.example.knowledge.infrastructure;
 
+import static com.example.knowledge.TestComponents.jdbcKnowledgeDao;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.example.knowledge.domain.KnowledgeBase;
@@ -76,7 +77,7 @@ class JdbcKnowledgeDaoTest {
         jdbcTemplate.update("INSERT INTO t_knowledge_base (name) VALUES (?)", "Java Knowledge");
         vectorStore = new RecordingVectorStore();
         embeddingModel = new RecordingEmbeddingModel();
-        repository = new JdbcKnowledgeDao(jdbcTemplate, vectorStore, embeddingModel, 2);
+        repository = jdbcKnowledgeDao(jdbcTemplate, vectorStore, embeddingModel, 2);
     }
 
     @Test
@@ -194,7 +195,7 @@ class JdbcKnowledgeDaoTest {
         searchJdbcTemplate.results = List.of(expectedHit);
         embeddingModel.output = new float[] {0.25F, -0.5F};
         JdbcKnowledgeDao searchRepository =
-                new JdbcKnowledgeDao(searchJdbcTemplate, vectorStore, embeddingModel, 2);
+                jdbcKnowledgeDao(searchJdbcTemplate, vectorStore, embeddingModel, 2);
 
         List<SearchHit> hits = searchRepository.search(1L, "Spring AI", 3);
 
@@ -219,7 +220,7 @@ class JdbcKnowledgeDaoTest {
         RecordingSearchJdbcTemplate searchJdbcTemplate = new RecordingSearchJdbcTemplate();
         embeddingModel.output = new float[] {0.1F, 0.2F};
         JdbcKnowledgeDao searchRepository =
-                new JdbcKnowledgeDao(searchJdbcTemplate, vectorStore, embeddingModel, 2);
+                jdbcKnowledgeDao(searchJdbcTemplate, vectorStore, embeddingModel, 2);
 
         searchRepository.search(null, "future tasks", 10);
 

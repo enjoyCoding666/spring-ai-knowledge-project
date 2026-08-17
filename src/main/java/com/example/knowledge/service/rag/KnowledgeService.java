@@ -7,18 +7,19 @@ import com.example.knowledge.dao.KnowledgeDao;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.IntStream;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
 
+@Service
 public class KnowledgeService {
 
     private static final String DEFAULT_SOURCE_TYPE = "TEXT";
 
-    private final KnowledgeDao knowledgeDao;
-    private final TextChunker textChunker;
+    @Autowired
+    private KnowledgeDao knowledgeDao;
 
-    public KnowledgeService(KnowledgeDao knowledgeDao, TextChunker textChunker) {
-        this.knowledgeDao = knowledgeDao;
-        this.textChunker = textChunker;
-    }
+    @Autowired
+    private TextChunker textChunker;
 
     /**
      * 切分并导入一篇知识文档。

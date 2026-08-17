@@ -1,12 +1,16 @@
 package com.example.knowledge.service.rag;
 
+import jakarta.annotation.PostConstruct;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.charset.CharacterCodingException;
 import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
 import org.springframework.web.multipart.MultipartFile;
 
+@Component
 public class PlainTextFileReader {
 
     private static final String EMPTY_FILE_MESSAGE = "File must not be empty";
@@ -15,13 +19,14 @@ public class PlainTextFileReader {
     private static final String INVALID_UTF8_MESSAGE = "File must contain valid UTF-8 text";
     private static final String READ_FAILURE_MESSAGE = "Unable to read uploaded file";
 
-    private final long maxFileSize;
+    @Value("${app.knowledge.max-file-size:10485760}")
+    private long maxFileSize;
 
-    public PlainTextFileReader(long maxFileSize) {
+    @PostConstruct
+    void validateConfiguration() {
         if (maxFileSize <= 0) {
             throw new IllegalArgumentException("Maximum file size must be positive");
         }
-        this.maxFileSize = maxFileSize;
     }
 
     /**

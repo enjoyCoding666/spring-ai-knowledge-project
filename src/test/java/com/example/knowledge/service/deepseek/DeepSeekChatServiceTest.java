@@ -4,13 +4,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.example.knowledge.thirdparty.DeepSeekChatClient;
 import org.junit.jupiter.api.Test;
+import org.springframework.test.util.ReflectionTestUtils;
 
 class DeepSeekChatServiceTest {
 
     @Test
     void shouldDelegateMessageToPort() {
         RecordingDeepSeekChatClient client = new RecordingDeepSeekChatClient();
-        DeepSeekChatService deepSeekChatService = new DeepSeekChatService(client);
+        DeepSeekChatService deepSeekChatService = new DeepSeekChatService();
+        ReflectionTestUtils.setField(deepSeekChatService, "deepSeekChatClient", client);
 
         String answer = deepSeekChatService.chat("介绍一下 Spring AI");
 

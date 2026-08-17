@@ -12,6 +12,7 @@ import com.example.knowledge.web.common.ApiResponse;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
@@ -29,21 +30,17 @@ public class KnowledgeController {
     private static final int DEFAULT_SEARCH_LIMIT = 5;
     private static final String RERANK_SOURCE_HEADER = "X-Rerank-Source";
 
-    private final KnowledgeImportUseCase knowledgeImporter;
-    private final KnowledgeSearchService knowledgeSearchService;
-    private final PlainTextFileReader plainTextFileReader;
-    private final KnowledgeBaseService knowledgeBaseService;
+    @Autowired
+    private KnowledgeImportUseCase knowledgeImporter;
 
-    public KnowledgeController(
-            KnowledgeImportUseCase knowledgeImporter,
-            KnowledgeSearchService knowledgeSearchService,
-            PlainTextFileReader plainTextFileReader,
-            KnowledgeBaseService knowledgeBaseService) {
-        this.knowledgeImporter = knowledgeImporter;
-        this.knowledgeSearchService = knowledgeSearchService;
-        this.plainTextFileReader = plainTextFileReader;
-        this.knowledgeBaseService = knowledgeBaseService;
-    }
+    @Autowired
+    private KnowledgeSearchService knowledgeSearchService;
+
+    @Autowired
+    private PlainTextFileReader plainTextFileReader;
+
+    @Autowired
+    private KnowledgeBaseService knowledgeBaseService;
 
     @PostMapping("/bases")
     public ResponseEntity<ApiResponse<KnowledgeBaseCreateResponse>> createKnowledgeBase(

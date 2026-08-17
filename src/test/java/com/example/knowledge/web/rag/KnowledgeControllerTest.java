@@ -1,5 +1,8 @@
 package com.example.knowledge.web.rag;
 
+import static com.example.knowledge.TestComponents.knowledgeBaseService;
+import static com.example.knowledge.TestComponents.knowledgeSearchService;
+import static com.example.knowledge.TestComponents.plainTextFileReader;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
@@ -32,6 +35,7 @@ import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.test.util.ReflectionTestUtils;
 
 class KnowledgeControllerTest {
 
@@ -49,14 +53,16 @@ class KnowledgeControllerTest {
         };
         repository = new StubKnowledgeDao();
         KnowledgeSearchService searchService =
-                new KnowledgeSearchService(repository, new PassthroughReranker(), 30);
-        KnowledgeBaseService knowledgeBaseService = new KnowledgeBaseService(repository);
+                knowledgeSearchService(repository, new PassthroughReranker(), 30);
+        KnowledgeBaseService knowledgeBaseService = knowledgeBaseService(repository);
+        KnowledgeController controller = new KnowledgeController();
+        ReflectionTestUtils.setField(controller, "knowledgeImporter", importer);
+        ReflectionTestUtils.setField(controller, "knowledgeSearchService", searchService);
+        ReflectionTestUtils.setField(
+                controller, "plainTextFileReader", plainTextFileReader(MAX_FILE_SIZE));
+        ReflectionTestUtils.setField(controller, "knowledgeBaseService", knowledgeBaseService);
         mockMvc = MockMvcBuilders
-                .standaloneSetup(new KnowledgeController(
-                        importer,
-                        searchService,
-                        new PlainTextFileReader(MAX_FILE_SIZE),
-                        knowledgeBaseService))
+                .standaloneSetup(controller)
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();
     }
