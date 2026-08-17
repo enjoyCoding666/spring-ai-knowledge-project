@@ -12,6 +12,31 @@
 - DeepSeek 云端模型：`deepseek-chat`（独立对话接口，可选）
 - PostgreSQL + PgVector 持久化
 
+## 项目结构
+
+项目按功能整理 Service 和 Web 层，方便从接口入口快速找到对应业务逻辑：
+
+```text
+src/main/java/com/example/knowledge
+├── service
+│   ├── rag                 # 知识导入、分块、检索、精排和 RAG 问答
+│   ├── deepseek            # DeepSeek 对话
+│   └── functioncalling     # Ollama + Qwen Function Calling 示例
+├── web
+│   ├── rag                 # RAG 与知识库接口及 DTO
+│   ├── deepseek            # DeepSeek 接口及 DTO
+│   ├── functioncalling     # Function Calling 接口及 DTO
+│   └── common              # 公共响应结构
+├── dao                     # 数据库访问抽象
+├── thirdparty              # 模型与外部服务抽象
+├── infrastructure          # DAO、模型和外部服务的具体实现
+├── domain                  # 领域数据对象
+└── config                  # Spring Bean 配置
+```
+
+`GlobalExceptionHandler` 位于 `web` 根包，对所有功能接口统一处理异常。HTTP URL、请求参数和
+`code/message/data` 响应结构不会因目录划分而改变。
+
 ## 运行
 
 ### 环境准备

@@ -292,7 +292,7 @@ Embedding 调用，以保持 Spring AI 写入流程简单可靠。
 
 ### 检索流程
 
-`KnowledgeSearchService` 是统一检索编排层。它先调用 `KnowledgeRepository.search` 获取最多
+`KnowledgeSearchService` 是统一检索编排层。它先调用 `KnowledgeDao.search` 获取最多
 30 条候选，再调用 `Reranker` 完成精排。`CohereReranker` 是 `Reranker` 的基础设施实现，
 负责构造 SDK 请求、验证响应索引，并将 Cohere `relevanceScore` 映射回 `SearchHit.score`。
 
@@ -411,3 +411,68 @@ Content-Type: application/json
 - 在响应中暴露非敏感的工具调用轨迹，帮助学习者区分模型决策、Java 执行和模型总结三个阶段。
 - 每个请求创建独立 `WeatherTools`，未使用单例可变调用状态，避免并发请求相互污染。
 - 第一版只提供一个只读天气工具，不加入计算器、多工具选择、流式响应或持久化，遵守 YAGNI。
+
+## 按功能整理 Service 与 Web 包结构
+
+### 理解摘要与边界
+
+- 将当前职责混杂的 `application` 包改为按功能划分的 `service` 包。
+- RAG、DeepSeek 和 Function Calling 分别使用独立的 Service 子包。
+- Web 层的 Controller 与所属请求、响应 DTO 按相同功能拆分。
+- 数据库访问抽象放入独立 `dao` 包，模型与外部服务抽象放入独立 `thirdparty` 包。
+- `domain`、`infrastructure` 和 `config` 暂不按功能继续拆分。
+- 所有 HTTP URL、请求参数、响应格式、数据库访问和模型调用行为保持不变。
+
+本次工作是代码组织重构，不新增业务功能，不改变性能、容量、异步、安全或可用性策略。
+测试目录同步采用功能分包。公共响应对象由各功能共享，避免复制；全局异常处理继续作用于所有接口。
+
+### 最终目录设计
+
+```text
+com.example.knowledge
+├── service
+│   ├── rag
+│   ├── deepseek
+│   └── functioncalling
+├── web
+│   ├── common
+│   ├── rag
+│   ├── deepseek
+│   ├── functioncalling
+│   └── GlobalExceptionHandler.java
+├── dao
+│   └── KnowledgeDao.java
+├── thirdparty
+│   ├── LanguageModel.java
+│   ├── Reranker.java
+│   └── DeepSeekChatClient.java
+├── domain
+├── infrastructure
+└── config
+```
+
+RAG 的知识库管理、导入、文件读取、分块、检索、Rerank 编排和问答类全部进入
+`service.rag`。DeepSeek 对话编排进入 `service.deepseek`。天气工具调用的 UseCase、Service 和
+模拟数据提供器进入 `service.functioncalling`。
+
+`KnowledgeRepository` 重命名为 `KnowledgeDao`，其 JDBC 实现重命名为 `JdbcKnowledgeDao`。
+`DeepSeekChatPort` 重命名为 `DeepSeekChatClient`，其 Spring AI 实现重命名为
+`SpringAiDeepSeekChatClient`。`LanguageModel` 与 `Reranker` 仅迁移到 `thirdparty`，名称保持不变。
+基础设施实现仍保留在 `infrastructure` 包。
+
+### 迁移与验证策略
+
+迁移以功能为单位进行：先更新测试的目标包并确认编译失败，再移动生产类、修改 package 和 import，
+随后运行该功能的针对性测试。三个功能迁移完成后删除空的 `application` 和 `port` 包，运行全部测试。
+最后检查旧包名和旧类名没有残留，并通过本地接口冒烟测试确认 URL 与响应兼容。
+
+此次迁移不读写知识库表数据，文档、测试及日志只使用虚构内容，不记录 API Key 或本地隐私配置。
+
+### 决策记录
+
+- 选择直接迁移现有类，而不是增加包装 Service，避免无业务价值的重复层级。
+- 选择 `service/<feature>` 与 `web/<feature>`，让学习者能够按功能快速定位入口和编排逻辑。
+- 不将数据库及第三方抽象放入 `service`，避免业务实现与依赖边界混在同一目录。
+- 数据库访问抽象命名为 `dao`，第三方模型及外部服务抽象命名为 `thirdparty`，符合本项目约定。
+- 本次不进一步拆分 `domain`、`infrastructure` 和 `config`，控制重构范围和回归风险。
+- 保持所有接口契约与业务行为不变，将测试结果作为迁移正确性的主要判据。

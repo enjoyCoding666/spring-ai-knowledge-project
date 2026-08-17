@@ -1,8 +1,8 @@
 package com.example.knowledge.web;
 
-import com.example.knowledge.application.InvalidKnowledgeFileException;
-import com.example.knowledge.application.KnowledgeBaseNotFoundException;
-import com.example.knowledge.web.dto.ApiResponse;
+import com.example.knowledge.service.rag.InvalidKnowledgeFileException;
+import com.example.knowledge.service.rag.KnowledgeBaseNotFoundException;
+import com.example.knowledge.web.common.ApiResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;

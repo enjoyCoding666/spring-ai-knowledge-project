@@ -2,9 +2,9 @@ package com.example.knowledge.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.example.knowledge.application.PassthroughReranker;
+import com.example.knowledge.service.rag.PassthroughReranker;
 import com.example.knowledge.infrastructure.CohereReranker;
-import com.example.knowledge.port.Reranker;
+import com.example.knowledge.thirdparty.Reranker;
 import org.junit.jupiter.api.Test;
 
 class KnowledgeConfigurationTest {

@@ -1,29 +1,29 @@
 package com.example.knowledge.config;
 
 import com.cohere.api.Cohere;
-import com.example.knowledge.application.AsyncChatUseCase;
-import com.example.knowledge.application.AsyncKnowledgeImporter;
-import com.example.knowledge.application.ChatUseCase;
-import com.example.knowledge.application.DeepSeekChatService;
-import com.example.knowledge.application.KnowledgeBaseService;
-import com.example.knowledge.application.KnowledgeImportUseCase;
-import com.example.knowledge.application.KnowledgeSearchService;
-import com.example.knowledge.application.KnowledgeService;
-import com.example.knowledge.application.PassthroughReranker;
-import com.example.knowledge.application.PlainTextFileReader;
-import com.example.knowledge.application.RagChatService;
-import com.example.knowledge.application.TextChunker;
-import com.example.knowledge.application.WeatherDataProvider;
-import com.example.knowledge.application.WeatherFunctionCallingService;
-import com.example.knowledge.application.WeatherFunctionCallingUseCase;
+import com.example.knowledge.dao.KnowledgeDao;
 import com.example.knowledge.infrastructure.CohereReranker;
-import com.example.knowledge.infrastructure.JdbcKnowledgeRepository;
-import com.example.knowledge.infrastructure.SpringAiDeepSeekChatPort;
+import com.example.knowledge.infrastructure.JdbcKnowledgeDao;
+import com.example.knowledge.infrastructure.SpringAiDeepSeekChatClient;
 import com.example.knowledge.infrastructure.SpringAiLanguageModel;
-import com.example.knowledge.port.DeepSeekChatPort;
-import com.example.knowledge.port.KnowledgeRepository;
-import com.example.knowledge.port.LanguageModel;
-import com.example.knowledge.port.Reranker;
+import com.example.knowledge.service.deepseek.DeepSeekChatService;
+import com.example.knowledge.service.functioncalling.WeatherDataProvider;
+import com.example.knowledge.service.functioncalling.WeatherFunctionCallingService;
+import com.example.knowledge.service.functioncalling.WeatherFunctionCallingUseCase;
+import com.example.knowledge.service.rag.AsyncChatUseCase;
+import com.example.knowledge.service.rag.AsyncKnowledgeImporter;
+import com.example.knowledge.service.rag.ChatUseCase;
+import com.example.knowledge.service.rag.KnowledgeBaseService;
+import com.example.knowledge.service.rag.KnowledgeImportUseCase;
+import com.example.knowledge.service.rag.KnowledgeSearchService;
+import com.example.knowledge.service.rag.KnowledgeService;
+import com.example.knowledge.service.rag.PassthroughReranker;
+import com.example.knowledge.service.rag.PlainTextFileReader;
+import com.example.knowledge.service.rag.RagChatService;
+import com.example.knowledge.service.rag.TextChunker;
+import com.example.knowledge.thirdparty.DeepSeekChatClient;
+import com.example.knowledge.thirdparty.LanguageModel;
+import com.example.knowledge.thirdparty.Reranker;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.deepseek.DeepSeekChatModel;
 import org.springframework.ai.embedding.EmbeddingModel;
@@ -61,12 +61,12 @@ public class KnowledgeConfiguration {
     }
 
     @Bean
-    public KnowledgeRepository knowledgeRepository(
+    public KnowledgeDao knowledgeDao(
             JdbcTemplate jdbcTemplate,
             VectorStore vectorStore,
             EmbeddingModel embeddingModel,
             @Value("${app.knowledge.batch-size:500}") int batchSize) {
-        return new JdbcKnowledgeRepository(jdbcTemplate, vectorStore, embeddingModel, batchSize);
+        return new JdbcKnowledgeDao(jdbcTemplate, vectorStore, embeddingModel, batchSize);
     }
 
     @Bean
@@ -91,13 +91,13 @@ public class KnowledgeConfiguration {
     }
 
     @Bean
-    public DeepSeekChatPort deepSeekChatPort(DeepSeekChatModel deepSeekChatModel) {
-        return new SpringAiDeepSeekChatPort(ChatClient.builder(deepSeekChatModel).build());
+    public DeepSeekChatClient deepSeekChatClient(DeepSeekChatModel deepSeekChatModel) {
+        return new SpringAiDeepSeekChatClient(ChatClient.builder(deepSeekChatModel).build());
     }
 
     @Bean
-    public DeepSeekChatService deepSeekChatService(DeepSeekChatPort deepSeekChatPort) {
-        return new DeepSeekChatService(deepSeekChatPort);
+    public DeepSeekChatService deepSeekChatService(DeepSeekChatClient deepSeekChatClient) {
+        return new DeepSeekChatService(deepSeekChatClient);
     }
 
     @Bean
@@ -116,22 +116,22 @@ public class KnowledgeConfiguration {
 
     @Bean
     public KnowledgeSearchService knowledgeSearchService(
-            KnowledgeRepository knowledgeRepository,
+            KnowledgeDao knowledgeDao,
             Reranker reranker,
             @Value("${app.knowledge.rerank.candidate-limit:30}") int candidateLimit) {
-        return new KnowledgeSearchService(knowledgeRepository, reranker, candidateLimit);
+        return new KnowledgeSearchService(knowledgeDao, reranker, candidateLimit);
     }
 
     @Bean
     public KnowledgeService knowledgeService(
-            KnowledgeRepository knowledgeRepository,
+            KnowledgeDao knowledgeDao,
             TextChunker textChunker) {
-        return new KnowledgeService(knowledgeRepository, textChunker);
+        return new KnowledgeService(knowledgeDao, textChunker);
     }
 
     @Bean
-    public KnowledgeBaseService knowledgeBaseService(KnowledgeRepository knowledgeRepository) {
-        return new KnowledgeBaseService(knowledgeRepository);
+    public KnowledgeBaseService knowledgeBaseService(KnowledgeDao knowledgeDao) {
+        return new KnowledgeBaseService(knowledgeDao);
     }
 
     @Bean

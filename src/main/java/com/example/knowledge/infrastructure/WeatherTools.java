@@ -1,6 +1,6 @@
 package com.example.knowledge.infrastructure;
 
-import com.example.knowledge.application.WeatherDataProvider;
+import com.example.knowledge.service.functioncalling.WeatherDataProvider;
 import com.example.knowledge.domain.WeatherResult;
 import com.example.knowledge.domain.WeatherToolArguments;
 import com.example.knowledge.domain.WeatherToolInvocation;

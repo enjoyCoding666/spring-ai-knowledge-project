@@ -3,10 +3,10 @@ package com.example.knowledge.infrastructure;
 import com.cohere.api.Cohere;
 import com.cohere.api.resources.v2.requests.V2RerankRequest;
 import com.cohere.api.resources.v2.types.V2RerankResponse;
-import com.example.knowledge.application.RerankingException;
+import com.example.knowledge.service.rag.RerankingException;
 import com.example.knowledge.domain.ScoreSource;
 import com.example.knowledge.domain.SearchHit;
-import com.example.knowledge.port.Reranker;
+import com.example.knowledge.thirdparty.Reranker;
 import java.util.List;
 import java.util.function.Function;
 

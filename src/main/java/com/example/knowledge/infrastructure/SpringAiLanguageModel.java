@@ -1,6 +1,6 @@
 package com.example.knowledge.infrastructure;
 
-import com.example.knowledge.port.LanguageModel;
+import com.example.knowledge.thirdparty.LanguageModel;
 import org.springframework.ai.chat.client.ChatClient;
 
 public class SpringAiLanguageModel implements LanguageModel {

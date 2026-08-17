@@ -5,7 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.cohere.api.resources.v2.requests.V2RerankRequest;
 import com.cohere.api.resources.v2.types.V2RerankResponse;
 import com.cohere.api.resources.v2.types.V2RerankResponseResultsItem;
-import com.example.knowledge.application.RerankingException;
+import com.example.knowledge.service.rag.RerankingException;
 import com.example.knowledge.domain.ScoreSource;
 import com.example.knowledge.domain.SearchHit;
 import java.util.List;

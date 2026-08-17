@@ -2,7 +2,7 @@ package com.example.knowledge.infrastructure;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.example.knowledge.application.WeatherDataProvider;
+import com.example.knowledge.service.functioncalling.WeatherDataProvider;
 import com.example.knowledge.domain.WeatherResult;
 import org.junit.jupiter.api.Test;
 

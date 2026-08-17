@@ -2,8 +2,8 @@ package com.example.knowledge;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.example.knowledge.application.ChatUseCase;
-import com.example.knowledge.application.KnowledgeImportUseCase;
+import com.example.knowledge.service.rag.ChatUseCase;
+import com.example.knowledge.service.rag.KnowledgeImportUseCase;
 import java.util.Arrays;
 import java.util.List;
 import org.junit.jupiter.api.Test;
